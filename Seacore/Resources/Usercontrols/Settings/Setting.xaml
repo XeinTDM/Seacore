@@ -1,0 +1,24 @@
+﻿<UserControl x:Class="Seacore.Resources.Usercontrols.Setting" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:Seacore.Resources.Usercontrols.Settings.Styles" mc:Ignorable="d" d:DesignHeight="506" d:DesignWidth="868">
+
+    <Grid>
+        <TextBlock Text="Settings" FontSize="18" Foreground="#fff" Margin="54,-35,0,0" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+        <local:BackButtonControl x:Name="BackButtonControl" VerticalAlignment="Top" HorizontalAlignment="Left"/>
+
+        <Frame x:Name="ContentFrame" Margin="0,30,0,0" NavigationUIVisibility="Hidden"/>
+
+        <StackPanel x:Name="SettingsButtonsPanel" Width="486" Height="283" VerticalAlignment="Center" Margin="0,0,0,30">
+            <StackPanel Orientation="Horizontal">
+                <Button Style="{StaticResource account}" Cursor="Hand" Click="AccountButton_Click"/>
+                <Button Style="{StaticResource general}" Margin="3,0,3,0" Cursor="Hand" Click="GeneralButton_Click"/>
+                <Button Style="{StaticResource security}" Cursor="Hand" Click="SecurityButton_Click"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                <Button Style="{StaticResource appearance}" Cursor="Hand" Click="AppearanceButton_Click"/>
+                <Button Style="{StaticResource advanced}" Margin="3,0,3,0" Cursor="Hand" Click="AdvancedButton_Click"/>
+                <Button Style="{StaticResource feedback}" Cursor="Hand" Click="FeedbackButton_Click"/>
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</UserControl>

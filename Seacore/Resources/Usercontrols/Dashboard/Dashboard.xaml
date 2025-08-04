@@ -1,0 +1,89 @@
+﻿<UserControl x:Class="Seacore.Resources.Usercontrols.Dashboard" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"  xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:Seacore.Resources.Usercontrols"
+             mc:Ignorable="d"
+             d:DesignHeight="506" d:DesignWidth="868">
+
+    <Grid>
+        <TextBlock Text="Dashboard" FontSize="18" Foreground="#fff" Margin="54,-35,0,0" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+        <Grid Width="757" Height="110" VerticalAlignment="Top" Margin="0,40,0,0">
+            <Button Width="215" Height="100" HorizontalAlignment="Left" Cursor="Hand" Click="DBclientsBtn_Click">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border CornerRadius="5">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,1" EndPoint="1,0">
+                                    <GradientStop Color="#2A47B6" Offset="0"/>
+                                    <GradientStop Color="#2FAC6F" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <Grid>
+                                <TextBlock Text="Online" FontSize="22" FontFamily="Istok Web" Foreground="#fff" Margin="22,12,0,66"/>
+                                <TextBlock Text="0" FontSize="22" FontFamily="Istok Web" Foreground="#fff" Margin="22,0,0,12" VerticalAlignment="Bottom"/>
+                                <!--#region Path-->
+                                <Path Height="50" Stretch="Uniform" Fill="#000" Opacity="0.5" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,35,0" Data="M24 6A6 6 0 1024 18 6 6 0 1024 6zM11 8A5 5 0 1011 18 5 5 0 1011 8zM37 8A5 5 0 1037 18 5 5 0 1037 8zM24 42c-4.962 0-9-4.038-9-9v-9.5c0-1.93 1.57-3.5 3.5-3.5h11c1.93 0 3.5 1.57 3.5 3.5V33C33 37.962 28.962 42 24 42zM13 33v-9.5c0-1.328.474-2.548 1.261-3.5H7.5C5.57 20 4 21.57 4 23.5V30c0 4.41 3.59 8 8 8 .71 0 1.4-.09 2.06-.27 0 0 .011-.005.02-.008C13.395 36.289 13 34.691 13 33zM35 33v-9.5c0-1.328-.474-2.548-1.261-3.5H40.5c1.93 0 3.5 1.57 3.5 3.5V30c0 4.41-3.59 8-8 8-.71 0-1.4-.09-2.06-.27 0 0-.011-.005-.02-.008C34.605 36.289 35 34.691 35 33z"/>
+                                <!--#endregion-->
+                            </Grid>
+                        </Border>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
+
+            <Button Width="215" Height="100" HorizontalAlignment="Center" Cursor="Hand" Click="DBserverBtn_Click">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border CornerRadius="5">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,1" EndPoint="1,0">
+                                    <GradientStop Color="#FF3654" Offset="0"/>
+                                    <GradientStop Color="#FFC269" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <Grid>
+                                <TextBlock Text="Server" FontSize="22" FontFamily="Istok Web" Foreground="#fff" Margin="22,12,0,66"/>
+                                <TextBlock Text="0" FontSize="22" FontFamily="Istok Web" Foreground="#fff" Margin="22,0,0,12" VerticalAlignment="Bottom"/>
+                                <!--#region Path-->
+                                <Path Height="50" Stretch="Uniform" Fill="#000" Opacity="0.5" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,35,0" Data="M6,38.5C6,40.43,7.57,42,9.5,42h29c1.93,0,3.5-1.57,3.5-3.5V32H6V38.5z M6,29h36V19H6V29z M38.5,6h-29C7.57,6,6,7.57,6,9.5 V16h36V9.5C42,7.57,40.43,6,38.5,6z M37,11c0,1.105-0.895,2-2,2s-2-0.895-2-2s0.895-2,2-2S37,9.895,37,11z M21.5,12.5h-9 c-0.828,0-1.5-0.671-1.5-1.5s0.672-1.5,1.5-1.5h9c0.828,0,1.5,0.671,1.5,1.5S22.328,12.5,21.5,12.5z M37,24c0,1.105-0.895,2-2,2 s-2-0.895-2-2s0.895-2,2-2S37,22.895,37,24z M21.5,25.5h-9c-0.828,0-1.5-0.671-1.5-1.5s0.672-1.5,1.5-1.5h9 c0.828,0,1.5,0.671,1.5,1.5S22.328,25.5,21.5,25.5z M37,37c0,1.105-0.895,2-2,2s-2-0.895-2-2s0.895-2,2-2S37,35.895,37,37z M21.5,38.5h-9c-0.828,0-1.5-0.671-1.5-1.5s0.672-1.5,1.5-1.5h9c0.828,0,1.5,0.671,1.5,1.5S22.328,38.5,21.5,38.5z"/>
+                                <!--#endregion-->
+                            </Grid>
+                        </Border>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
+
+            <Border Width="215" Height="100" HorizontalAlignment="Right" CornerRadius="5" Cursor="Hand">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,1" EndPoint="1,0">
+                        <GradientStop Color="#65169F" Offset="0"/>
+                        <GradientStop Color="#E803FD" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Grid>
+                    <TextBlock Text="CPU" FontSize="22" FontFamily="Istok Web" Foreground="#fff" Margin="22,12,0,66"/>
+                    <TextBlock Text="1.6%" FontSize="22" FontFamily="Istok Web" Foreground="#fff" Margin="22,0,0,12" VerticalAlignment="Bottom"/>
+                    <!--#region Path-->
+                    <Path Height="55" Stretch="Uniform" Fill="#000" Opacity="0.5" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,35,0" Data="M 45.81 17.78 Q 45.82 18.74 46.78 18.74 L 53.22 18.75 Q 54.19 18.75 54.19 17.78 L 54.19 13.97 Q 54.19 11.02 57.08 10.44 Q 58.44 10.17 59.94 12.02 A 2.09 2.06 -65.4 0 1 60.41 13.31 L 60.45 17.85 Q 60.46 18.74 61.35 18.74 L 68.00 18.74 Q 68.75 18.75 68.75 18.00 L 68.75 13.87 Q 68.75 10.80 71.81 10.45 Q 72.41 10.38 72.99 10.67 Q 75.00 11.67 75.00 13.92 L 75.00 18.61 Q 75.00 19.37 75.69 19.67 Q 78.91 21.07 80.35 24.31 Q 80.65 25.00 81.41 25.00 L 86.20 25.00 Q 88.46 25.00 89.39 27.06 Q 89.68 27.70 89.55 28.37 Q 89.00 31.25 86.08 31.26 L 82.25 31.26 Q 81.25 31.26 81.25 32.25 L 81.25 38.67 Q 81.25 39.59 82.17 39.59 L 86.15 39.58 Q 89.19 39.57 89.59 42.58 Q 89.64 42.96 89.54 43.32 Q 88.95 45.50 87.40 45.62 Q 83.38 45.95 82.40 45.78 Q 81.25 45.57 81.25 46.74 L 81.25 53.50 Q 81.25 54.52 82.24 54.26 Q 83.12 54.04 87.36 54.35 Q 88.96 54.47 89.54 56.69 Q 89.66 57.16 89.54 57.64 Q 88.90 60.42 86.05 60.42 L 82.17 60.41 Q 81.25 60.41 81.25 61.33 L 81.25 67.62 Q 81.25 68.74 82.37 68.74 L 86.19 68.74 Q 89.31 68.75 89.59 71.85 Q 89.65 72.45 89.35 73.02 Q 88.31 75.00 86.08 75.00 L 81.40 75.00 Q 80.64 75.00 80.34 75.70 Q 78.90 78.97 75.56 80.40 Q 75.00 80.63 75.00 81.23 L 75.00 86.24 A 2.25 2.25 0.0 0 1 74.78 87.21 Q 73.59 89.80 71.82 89.58 Q 68.75 89.18 68.75 86.09 L 68.75 82.25 Q 68.75 81.26 67.75 81.26 L 61.25 81.26 Q 60.27 81.26 60.37 82.24 Q 60.59 84.49 60.36 86.65 Q 60.08 89.39 57.34 89.58 Q 56.17 89.66 55.04 88.72 A 2.34 2.32 20.2 0 1 54.21 86.94 L 54.18 82.22 Q 54.18 81.25 53.22 81.25 L 46.78 81.26 Q 45.83 81.26 45.82 82.22 L 45.79 86.86 A 2.67 2.67 0.0 0 1 43.40 89.50 C 38.80 89.99 39.42 85.17 39.62 82.22 Q 39.69 81.26 38.72 81.26 L 32.25 81.26 Q 30.97 81.26 31.21 82.52 Q 31.37 83.33 31.18 86.47 Q 31.03 89.05 28.49 89.54 Q 27.87 89.67 27.25 89.44 Q 25.00 88.59 25.00 86.19 L 25.00 81.39 Q 25.00 80.65 24.33 80.35 Q 21.09 78.91 19.65 75.70 Q 19.34 75.00 18.57 75.00 L 14.04 75.00 Q 11.74 75.00 10.65 72.98 Q 10.39 72.51 10.40 72.00 Q 10.49 68.74 13.75 68.74 L 18.00 68.74 Q 18.75 68.74 18.75 68.00 L 18.75 61.24 Q 18.75 60.41 17.91 60.41 L 13.15 60.42 A 2.76 2.76 0.0 0 1 10.41 57.32 L 10.54 56.30 A 2.30 2.29 -89.5 0 1 12.58 54.29 Q 15.81 53.95 17.45 54.29 Q 18.75 54.57 18.75 53.24 L 18.75 46.75 Q 18.75 45.41 17.44 45.71 Q 15.86 46.07 13.21 45.72 A 2.57 2.52 64.0 0 1 12.22 45.37 Q 10.03 44.04 10.44 42.42 Q 11.14 39.58 14.07 39.58 L 17.83 39.58 Q 18.75 39.59 18.75 38.67 L 18.75 32.25 Q 18.75 31.26 17.75 31.26 L 13.79 31.26 Q 10.61 31.26 10.40 28.08 Q 10.37 27.59 10.58 27.13 Q 11.56 25.00 13.90 25.00 L 18.59 25.00 A 1.17 1.16 -77.8 0 0 19.65 24.31 Q 21.10 21.09 24.30 19.65 Q 25.00 19.33 25.00 18.56 L 25.00 13.95 Q 25.00 11.71 26.99 10.67 Q 27.58 10.36 28.20 10.44 Q 31.25 10.79 31.25 13.86 L 31.25 17.74 Q 31.25 18.74 32.25 18.74 L 38.40 18.74 Q 39.54 18.74 39.55 17.60 L 39.58 13.90 Q 39.59 11.22 42.18 10.51 Q 42.90 10.31 43.57 10.56 Q 45.79 11.37 45.80 13.74 L 45.81 17.78 Z M 62.4838 40.7282 A 3.24 3.24 0.0 0 0 59.2382 37.4939 L 40.7182 37.5262 A 3.24 3.24 0.0 0 0 37.4839 40.7718 L 37.5162 59.2918 A 3.24 3.24 0.0 0 0 40.7618 62.5261 L 59.2818 62.4938 A 3.24 3.24 0.0 0 0 62.5161 59.2482 L 62.4838 40.7282 Z"/>
+                    <!--#endregion-->
+                </Grid>
+            </Border>
+        </Grid>
+
+
+        <!--//Logs//-->
+        <Border x:Name="Log" Width="757" Height="286" VerticalAlignment="Bottom" Margin="0,0,0,40" CornerRadius="5" Background="Black" Opacity="0.15">
+            <Border.Triggers>
+                <EventTrigger RoutedEvent="Mouse.MouseEnter">
+                    <BeginStoryboard Storyboard="{StaticResource MouseHover}"/>
+                </EventTrigger>
+                <EventTrigger RoutedEvent="Mouse.MouseLeave">
+                    <BeginStoryboard Storyboard="{StaticResource MouseLeave}"/>
+                </EventTrigger>
+            </Border.Triggers>
+            <Grid>
+                <ListBox x:Name="LogsView" Background="Transparent" BorderThickness="0">
+
+                </ListBox>
+                <Button x:Name="removelogs" Margin="0,10,12,0" Opacity="0" Style="{StaticResource removeLogs}" Width="17" Height="17" VerticalAlignment="Top" HorizontalAlignment="Right" Cursor="Hand" />
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

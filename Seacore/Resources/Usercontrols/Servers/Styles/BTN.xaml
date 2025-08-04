@@ -1,0 +1,241 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Style x:Key="startListening" TargetType="Button">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="bg" Width="47" Height="30" Background="#19DBD3FF" CornerRadius="4">
+                        <Grid>
+                            <Image Stretch="Uniform" Source="\Resources\Usercontrols\Servers\Image\icons8-wi-fi-96.png" Margin="12,0,0,1" Width="24" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                            <TextBlock x:Name="txt" Text="Start Listening" FontSize="14" Foreground="#fff" FontFamily="Inter" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,13,0" Opacity="0"/>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True"/>
+                            </MultiTrigger.Conditions>
+                            <MultiTrigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <ColorAnimation Storyboard.TargetName="bg"
+                                                        Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
+                                                        To="#3FDBD3FF" Duration="0:0:0.1"/>
+
+                                        <DoubleAnimation Storyboard.TargetName="bg"
+                                                         Storyboard.TargetProperty="Width"
+                                                         To="146" Duration="0:0:0.3"/>
+
+                                        <DoubleAnimation Storyboard.TargetName="txt"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="1" Duration="0:0:0.2"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </MultiTrigger.EnterActions>
+                            <MultiTrigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <ColorAnimation Storyboard.TargetName="bg"
+                                                        Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
+                                                        To="#19DBD3FF" Duration="0:0:0.1"/>
+
+                                        <DoubleAnimation Storyboard.TargetName="bg"
+                                                         Storyboard.TargetProperty="Width"
+                                                         To="47" Duration="0:0:0.3"/>
+
+                                        <DoubleAnimation Storyboard.TargetName="txt"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="0" Duration="0:0:0.1"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </MultiTrigger.ExitActions>
+                        </MultiTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+
+    <Style x:Key="contextMenuEditPortBTN" TargetType="Button">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="Transparent" Height="30" CornerRadius="4">
+                        <Grid>
+                            <Border x:Name="bg" Background="#4B4990" Opacity="0" CornerRadius="4"/>
+
+                            <StackPanel Orientation="Horizontal">
+                                <Image Height="17" Width="20" Stretch="Uniform" Source="/Resources/Usercontrols/Servers/Image/image 515.png" Margin="11,0,8,0"/>
+                                <TextBlock Text="Edit port" FontSize="14" Foreground="#fff" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                    
+                    <ControlTemplate.Triggers>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True"/>
+                            </MultiTrigger.Conditions>
+                            <MultiTrigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                         Storyboard.TargetName="bg"
+                                                         To="0.2" Duration="0:0:0.2"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </MultiTrigger.EnterActions>
+                            <MultiTrigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                         Storyboard.TargetName="bg"
+                                                         To="0" Duration="0:0:0.2"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </MultiTrigger.ExitActions>
+                        </MultiTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="contextMenuEditNameBTN" TargetType="Button">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="Transparent" Height="30" CornerRadius="4">
+                        <Grid>
+                            <Border x:Name="bg" Background="#4B4990" Opacity="0" CornerRadius="4"/>
+
+                            <StackPanel Orientation="Horizontal">
+                                <Image Height="17" Width="20" Stretch="Uniform" Margin="11,0,8,0" Source="/Resources/Usercontrols/Servers/Image/image 5115.png"/>
+                                <TextBlock Text="Edit Name" FontSize="14" Foreground="#fff" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <ControlTemplate.Triggers>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True"/>
+                            </MultiTrigger.Conditions>
+                            <MultiTrigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                     Storyboard.TargetName="bg"
+                                                     To="0.2" Duration="0:0:0.2"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </MultiTrigger.EnterActions>
+                            <MultiTrigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                     Storyboard.TargetName="bg"
+                                                     To="0" Duration="0:0:0.2"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </MultiTrigger.ExitActions>
+                        </MultiTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="contextMenuPauseBTN" TargetType="Button">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="Transparent" Height="30" CornerRadius="4">
+                        <Grid>
+                            <Border x:Name="bg" Background="#4B4990" Opacity="0" CornerRadius="4"/>
+
+                            <StackPanel Orientation="Horizontal">
+                                <Image Height="17" Width="17" Stretch="Uniform" Margin="13,0,9,0" Source="/Resources/Usercontrols/Servers/Image/image 5151.png"/>
+                                <TextBlock Text="Pause" FontSize="14" Foreground="#fff" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <ControlTemplate.Triggers>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True"/>
+                            </MultiTrigger.Conditions>
+                            <MultiTrigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                  Storyboard.TargetName="bg"
+                                                  To="0.2" Duration="0:0:0.2"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </MultiTrigger.EnterActions>
+                            <MultiTrigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                  Storyboard.TargetName="bg"
+                                                  To="0" Duration="0:0:0.2"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </MultiTrigger.ExitActions>
+                        </MultiTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="contextMenuDeleteBTN" TargetType="Button">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="Transparent" Height="30" CornerRadius="4">
+                        <Grid>
+                            <Border x:Name="bg" Background="#4B4990" Opacity="0" CornerRadius="4"/>
+
+                            <StackPanel Orientation="Horizontal">
+                                <Image Height="17" Width="17" Stretch="Uniform" Margin="13,0,9,0" Source="/Resources/Usercontrols/Servers/Image/image 5152.png"/>
+                                <TextBlock Text="Delete" FontSize="14" Foreground="#fff" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <ControlTemplate.Triggers>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True"/>
+                            </MultiTrigger.Conditions>
+                            <MultiTrigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                               Storyboard.TargetName="bg"
+                                               To="0.2" Duration="0:0:0.2"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </MultiTrigger.EnterActions>
+                            <MultiTrigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                               Storyboard.TargetName="bg"
+                                               To="0" Duration="0:0:0.2"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </MultiTrigger.ExitActions>
+                        </MultiTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>

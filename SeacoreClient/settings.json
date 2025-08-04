@@ -1,0 +1,10 @@
+﻿{
+    "HeartbeatConfig": {
+        "ExcellentInterval": 8000,
+        "GoodInterval": 15000,
+        "ModerateInterval": 30000,
+        "PoorInterval": 60000,
+        "JitterPercentage": 0.1,
+        "MaxConsecutiveFailures": 5
+    }
+}

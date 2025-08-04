@@ -1,0 +1,76 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <UseWindowsForms>False</UseWindowsForms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Background.png" />
+    <None Remove="Resources\Assets\Icons\linux.png" />
+    <None Remove="Resources\Assets\Icons\mac.png" />
+    <None Remove="Resources\Assets\Icons\win10.png" />
+    <None Remove="Resources\Assets\Icons\win11.png" />
+    <None Remove="Resources\Usercontrols\Servers\Styles\icons8-wi-fi-96.png" />
+    <None Remove="Resources\Usercontrols\Servers\Styles\image 5115.png" />
+    <None Remove="Resources\Usercontrols\Servers\Styles\image 515.png" />
+    <None Remove="Resources\Usercontrols\Servers\Styles\image 5151.png" />
+    <None Remove="Resources\Usercontrols\Servers\Styles\image 5152.png" />
+    <None Remove="Resources\Usercontrols\Settings\Styles\[settings]-Appearance.png" />
+    <None Remove="Resources\Usercontrols\Settings\Styles\[settings]-Feedback.png" />
+    <None Remove="Resources\Usercontrols\Settings\Styles\[settings]-General.png" />
+    <None Remove="Resources\Usercontrols\Settings\Styles\[settings]-Security.png" />
+    <None Remove="Resources\Usercontrols\Settings\Styles\[settings]-User.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Resources\Assets\Icons\linux.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Resources\Assets\Icons\mac.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Resources\Assets\Icons\win10.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Resources\Assets\Icons\win11.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Resources\Usercontrols\Servers\Image\icons8-wi-fi-96.png" />
+    <Resource Include="Resources\Usercontrols\Servers\Image\image 515.png" />
+    <Resource Include="Resources\Usercontrols\Servers\Image\image 5115.png" />
+    <Resource Include="Resources\Usercontrols\Servers\Image\image 5151.png" />
+    <Resource Include="Resources\Usercontrols\Servers\Image\image 5152.png" />
+    <Resource Include="Resources\Usercontrols\Settings\Images\[settings]-User.png" />
+    <Resource Include="Resources\Usercontrols\Settings\Images\[settings]-General.png" />
+    <Resource Include="Resources\Usercontrols\Settings\Images\[settings]-Security.png" />
+    <Resource Include="Resources\Usercontrols\Settings\Images\[settings]-Appearance.png" />
+    <Resource Include="Resources\Usercontrols\Settings\Images\[settings]-Advanced.png" />
+    <Resource Include="Resources\Usercontrols\Settings\Images\[settings]-Feedback.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Resources\Usercontrols\Clients\Helpers\" />
+    <Folder Include="Resources\Usercontrols\Clients\Windows\Control\HVNC\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MessagePack" Version="2.5.192" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Toolkit.Mvvm" Version="7.1.2" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Serilog" Version="4.1.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SeacoreCommon\SeacoreCommon.csproj" />
+  </ItemGroup>
+
+</Project>
