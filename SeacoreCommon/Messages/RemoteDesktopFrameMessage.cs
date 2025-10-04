@@ -20,5 +20,20 @@ namespace SeacoreCommon.Messages
 
         [Key(4)]
         public string? StatusMessage { get; set; }
+
+        [Key(5)]
+        public int SequenceId { get; set; }
+
+        [Key(6)]
+        public int ChunkIndex { get; set; }
+
+        [Key(7)]
+        public int TotalChunks { get; set; } = 1;
+
+        [Key(8)]
+        public int OriginalWidth { get; set; }
+
+        [Key(9)]
+        public int OriginalHeight { get; set; }
     }
 }

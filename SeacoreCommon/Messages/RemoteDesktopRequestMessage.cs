@@ -13,5 +13,11 @@ namespace SeacoreCommon.Messages
 
         [Key(2)]
         public int JpegQuality { get; set; } = 70;
+
+        [Key(3)]
+        public int MaxFrameWidth { get; set; }
+
+        [Key(4)]
+        public int MaxFrameHeight { get; set; }
     }
 }
