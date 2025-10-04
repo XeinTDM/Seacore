@@ -30,6 +30,8 @@ namespace Seacore.Resources.Usercontrols.Clients.Windows.Control.RemoteDesktop
         };
 
         private long lastFrameTimestamp;
+        private WriteableBitmap? currentBitmap;
+        private bool awaitingKeyFrame = true;
 
         public RemoteDesktopWindow(ClientInfo clientInfo)
         {
@@ -83,15 +85,11 @@ namespace Seacore.Resources.Usercontrols.Clients.Windows.Control.RemoteDesktop
                 {
                     try
                     {
-                        using var stream = new MemoryStream(frame.ImageData);
-                        var bitmap = new BitmapImage();
-                        bitmap.BeginInit();
-                        bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                        bitmap.StreamSource = stream;
-                        bitmap.EndInit();
-                        bitmap.Freeze();
-
-                        remoteDesktopImage.Source = bitmap;
+                        if (!TryRenderFrame(frame))
+                        {
+                            statusTextBlock.Text = "Awaiting key frame...";
+                            return;
+                        }
 
                         long frameTimestamp = frame.Timestamp > 0
                             ? frame.Timestamp
@@ -110,8 +108,8 @@ namespace Seacore.Resources.Usercontrols.Clients.Windows.Control.RemoteDesktop
 
                         lastFrameTimestamp = frameTimestamp;
 
-                        int displayWidth = frame.Width > 0 ? frame.Width : bitmap.PixelWidth;
-                        int displayHeight = frame.Height > 0 ? frame.Height : bitmap.PixelHeight;
+                        int displayWidth = frame.Width > 0 ? frame.Width : currentBitmap?.PixelWidth ?? frame.Width;
+                        int displayHeight = frame.Height > 0 ? frame.Height : currentBitmap?.PixelHeight ?? frame.Height;
                         int sourceWidth = frame.OriginalWidth > 0 ? frame.OriginalWidth : displayWidth;
                         int sourceHeight = frame.OriginalHeight > 0 ? frame.OriginalHeight : displayHeight;
 
@@ -124,6 +122,12 @@ namespace Seacore.Resources.Usercontrols.Clients.Windows.Control.RemoteDesktop
                         if (fps.HasValue)
                         {
                             status += $" • ~{fps.Value:0.0} fps";
+                        }
+
+                        if (frame.IsDeltaFrame && frame.RegionWidth > 0 && frame.RegionHeight > 0)
+                        {
+                            double coverage = (frame.RegionWidth * frame.RegionHeight) / (double)Math.Max(1, displayWidth * displayHeight);
+                            status += $" • Δ {coverage * 100:0.#}%";
                         }
 
                         status += $" • Updated: {timestampLocal:HH:mm:ss}";
@@ -143,8 +147,10 @@ namespace Seacore.Resources.Usercontrols.Clients.Windows.Control.RemoteDesktop
                 else if (!string.IsNullOrWhiteSpace(frame.StatusMessage))
                 {
                     remoteDesktopImage.Source = null;
+                    currentBitmap = null;
                     statusTextBlock.Text = frame.StatusMessage;
                     lastFrameTimestamp = 0;
+                    awaitingKeyFrame = true;
                 }
             });
         }
@@ -160,6 +166,8 @@ namespace Seacore.Resources.Usercontrols.Clients.Windows.Control.RemoteDesktop
             {
                 statusTextBlock.Text = "Awaiting first frame...";
                 lastFrameTimestamp = 0;
+                awaitingKeyFrame = true;
+                currentBitmap = null;
             });
         }
 
@@ -178,7 +186,124 @@ namespace Seacore.Resources.Usercontrols.Clients.Windows.Control.RemoteDesktop
                 }
 
                 lastFrameTimestamp = 0;
+                awaitingKeyFrame = true;
+                currentBitmap = null;
             });
+        }
+
+        private bool TryRenderFrame(RemoteDesktopFrameMessage frame)
+        {
+            var bitmapSource = DecodeBitmap(frame.ImageData);
+            if (bitmapSource is null)
+            {
+                return false;
+            }
+
+            if (!frame.IsDeltaFrame || frame.IsKeyFrame)
+            {
+                return RenderKeyFrame(frame, bitmapSource);
+            }
+
+            if (awaitingKeyFrame || currentBitmap is null)
+            {
+                awaitingKeyFrame = true;
+                return false;
+            }
+
+            if (frame.Width > 0 && frame.Height > 0
+                && (frame.Width != currentBitmap.PixelWidth || frame.Height != currentBitmap.PixelHeight))
+            {
+                return RenderKeyFrame(frame, bitmapSource);
+            }
+
+            if (frame.RegionWidth <= 0 || frame.RegionHeight <= 0)
+            {
+                return true;
+            }
+
+            try
+            {
+                var formatted = new FormatConvertedBitmap(bitmapSource, PixelFormats.Pbgra32, null, 0);
+                formatted.Freeze();
+
+                int regionWidth = Math.Min(formatted.PixelWidth, frame.RegionWidth);
+                int regionHeight = Math.Min(formatted.PixelHeight, frame.RegionHeight);
+                if (regionWidth <= 0 || regionHeight <= 0)
+                {
+                    return true;
+                }
+
+                int stride = (formatted.Format.BitsPerPixel * regionWidth + 7) / 8;
+                var pixelData = new byte[stride * regionHeight];
+                formatted.CopyPixels(new Int32Rect(0, 0, regionWidth, regionHeight), pixelData, stride, 0);
+
+                var updateRect = new Int32Rect(
+                    Math.Clamp(frame.OffsetX, 0, Math.Max(0, currentBitmap.PixelWidth - 1)),
+                    Math.Clamp(frame.OffsetY, 0, Math.Max(0, currentBitmap.PixelHeight - 1)),
+                    regionWidth,
+                    regionHeight);
+
+                updateRect.Width = Math.Min(updateRect.Width, currentBitmap.PixelWidth - updateRect.X);
+                updateRect.Height = Math.Min(updateRect.Height, currentBitmap.PixelHeight - updateRect.Y);
+
+                if (updateRect.Width <= 0 || updateRect.Height <= 0)
+                {
+                    return true;
+                }
+
+                currentBitmap.WritePixels(updateRect, pixelData, stride, 0);
+                remoteDesktopImage.Source = currentBitmap;
+                awaitingKeyFrame = false;
+                return true;
+            }
+            catch
+            {
+                return RenderKeyFrame(frame, bitmapSource);
+            }
+        }
+
+        private bool RenderKeyFrame(RemoteDesktopFrameMessage frame, BitmapSource bitmapSource)
+        {
+            var formatted = new FormatConvertedBitmap(bitmapSource, PixelFormats.Pbgra32, null, 0);
+            formatted.Freeze();
+
+            int width = frame.Width > 0 ? frame.Width : formatted.PixelWidth;
+            int height = frame.Height > 0 ? frame.Height : formatted.PixelHeight;
+
+            if (width <= 0 || height <= 0)
+            {
+                awaitingKeyFrame = true;
+                return false;
+            }
+
+            currentBitmap = new WriteableBitmap(width, height, formatted.DpiX, formatted.DpiY, PixelFormats.Pbgra32, null);
+            int stride = (formatted.Format.BitsPerPixel * formatted.PixelWidth + 7) / 8;
+            var buffer = new byte[stride * formatted.PixelHeight];
+            formatted.CopyPixels(buffer, stride, 0);
+            currentBitmap.WritePixels(new Int32Rect(0, 0, formatted.PixelWidth, formatted.PixelHeight), buffer, stride, 0);
+
+            remoteDesktopImage.Source = currentBitmap;
+            awaitingKeyFrame = false;
+            return true;
+        }
+
+        private static BitmapSource? DecodeBitmap(byte[] data)
+        {
+            try
+            {
+                using var stream = new MemoryStream(data);
+                var bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.StreamSource = stream;
+                bitmap.EndInit();
+                bitmap.Freeze();
+                return bitmap;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private void RemoteDesktopWindow_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -308,22 +433,22 @@ namespace Seacore.Resources.Usercontrols.Clients.Windows.Control.RemoteDesktop
 
             if (megapixels >= 3.5)
             {
-                interval = 450;
+                interval = 320;
             }
             else if (megapixels >= 2.0)
             {
-                interval = 320;
+                interval = 220;
             }
             else if (megapixels >= 1.0)
             {
-                interval = 220;
+                interval = 150;
             }
             else
             {
-                interval = 160;
+                interval = 110;
             }
 
-            return Math.Max(120, interval);
+            return Math.Max(80, interval);
         }
 
         private RemoteDesktopRequestMessage CreateRequestSnapshot()

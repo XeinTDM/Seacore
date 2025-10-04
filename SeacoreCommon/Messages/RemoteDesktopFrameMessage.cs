@@ -35,5 +35,23 @@ namespace SeacoreCommon.Messages
 
         [Key(9)]
         public int OriginalHeight { get; set; }
+
+        [Key(10)]
+        public bool IsDeltaFrame { get; set; }
+
+        [Key(11)]
+        public int OffsetX { get; set; }
+
+        [Key(12)]
+        public int OffsetY { get; set; }
+
+        [Key(13)]
+        public int RegionWidth { get; set; }
+
+        [Key(14)]
+        public int RegionHeight { get; set; }
+
+        [Key(15)]
+        public bool IsKeyFrame { get; set; }
     }
 }

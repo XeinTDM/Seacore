@@ -17,6 +17,10 @@ namespace SeacoreClient.Features.RemoteDesktop
         private const int SmCxScreen = 0;
         private const int SmCyScreen = 1;
         private const int MaxChunkSize = 60 * 1024;
+        private const int BytesPerPixel = 4;
+        private const int PixelDifferenceThreshold = 45;
+        private const int KeyFrameIntervalMilliseconds = 4000;
+        private const double MaxDeltaCoverageBeforeKeyFrame = 0.45;
 
         [DllImport("user32.dll")]
         private static extern int GetSystemMetrics(int nIndex);
@@ -24,6 +28,11 @@ namespace SeacoreClient.Features.RemoteDesktop
         private static readonly object syncRoot = new();
         private static CancellationTokenSource? captureCts;
         private static int frameSequence;
+        private static byte[]? previousFrameBuffer;
+        private static int previousWidth;
+        private static int previousHeight;
+        private static int previousStride;
+        private static long lastKeyFrameTimestamp;
 
         public static void Start(TcpClientManager clientManager, RemoteDesktopRequestMessage request)
         {
@@ -45,6 +54,7 @@ namespace SeacoreClient.Features.RemoteDesktop
                 captureCts = new CancellationTokenSource();
                 var token = captureCts.Token;
                 var settings = new CaptureSettings(request);
+                ResetFrameState();
 
                 Task.Run(async () => await CaptureLoopAsync(clientManager, settings, token), token);
             }
@@ -66,6 +76,8 @@ namespace SeacoreClient.Features.RemoteDesktop
                 captureCts.Dispose();
                 captureCts = null;
             }
+
+            ResetFrameState();
         }
 
         private static async Task CaptureLoopAsync(TcpClientManager clientManager, CaptureSettings settings, CancellationToken token)
@@ -76,9 +88,12 @@ namespace SeacoreClient.Features.RemoteDesktop
                 {
                     try
                     {
-                        var frame = CaptureFrame(settings.Quality, settings.MaxWidth, settings.MaxHeight);
-                        frame.Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                        await SendFrameAsync(clientManager, frame, token).ConfigureAwait(false);
+                        var frame = CaptureFrame(settings);
+                        if (frame != null)
+                        {
+                            frame.Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                            await SendFrameAsync(clientManager, frame, token).ConfigureAwait(false);
+                        }
                     }
                     catch (OperationCanceledException)
                     {
@@ -147,7 +162,13 @@ namespace SeacoreClient.Features.RemoteDesktop
                     OriginalHeight = frame.OriginalHeight,
                     Timestamp = frame.Timestamp,
                     StatusMessage = chunkIndex == totalChunks - 1 ? frame.StatusMessage : null,
-                    ImageData = chunkBuffer
+                    ImageData = chunkBuffer,
+                    IsDeltaFrame = frame.IsDeltaFrame,
+                    IsKeyFrame = frame.IsKeyFrame,
+                    OffsetX = frame.OffsetX,
+                    OffsetY = frame.OffsetY,
+                    RegionWidth = frame.RegionWidth,
+                    RegionHeight = frame.RegionHeight
                 };
 
                 await clientManager.SendMessageAsync(chunkMessage, token).ConfigureAwait(false);
@@ -178,7 +199,7 @@ namespace SeacoreClient.Features.RemoteDesktop
         }
 
         [SupportedOSPlatform("windows")]
-        private static RemoteDesktopFrameMessage CaptureFrame(int quality, int maxWidth, int maxHeight)
+        private static RemoteDesktopFrameMessage? CaptureFrame(CaptureSettings settings)
         {
             int screenWidth = GetSystemMetrics(SmCxScreen);
             int screenHeight = GetSystemMetrics(SmCyScreen);
@@ -200,10 +221,10 @@ namespace SeacoreClient.Features.RemoteDesktop
 
             try
             {
-                if (maxWidth > 0 || maxHeight > 0)
+                if (settings.MaxWidth > 0 || settings.MaxHeight > 0)
                 {
-                    double widthScale = maxWidth > 0 ? (double)maxWidth / screenWidth : double.PositiveInfinity;
-                    double heightScale = maxHeight > 0 ? (double)maxHeight / screenHeight : double.PositiveInfinity;
+                    double widthScale = settings.MaxWidth > 0 ? (double)settings.MaxWidth / screenWidth : double.PositiveInfinity;
+                    double heightScale = settings.MaxHeight > 0 ? (double)settings.MaxHeight / screenHeight : double.PositiveInfinity;
                     double scale = Math.Min(Math.Min(widthScale, heightScale), 1.0);
 
                     if (scale < 0.995)
@@ -215,21 +236,196 @@ namespace SeacoreClient.Features.RemoteDesktop
                     }
                 }
 
-                var imageData = EncodeBitmapToJpeg(sourceBitmap, quality);
+                int stride;
+                var currentPixels = ExtractPixels(sourceBitmap, out stride);
+                bool hasPrevious = previousFrameBuffer != null
+                    && previousWidth == sourceBitmap.Width
+                    && previousHeight == sourceBitmap.Height
+                    && previousStride == stride;
 
-                return new RemoteDesktopFrameMessage
+                bool forceKeyFrame = !hasPrevious
+                    || Environment.TickCount64 - lastKeyFrameTimestamp >= KeyFrameIntervalMilliseconds;
+
+                Rectangle deltaRegion = Rectangle.Empty;
+                double coverage = 0;
+
+                RemoteDesktopFrameMessage? message = null;
+
+                if (forceKeyFrame)
                 {
-                    ImageData = imageData,
-                    Width = sourceBitmap.Width,
-                    Height = sourceBitmap.Height,
-                    OriginalWidth = screenWidth,
-                    OriginalHeight = screenHeight
-                };
+                    message = CreateKeyFrameMessage(sourceBitmap, screenWidth, screenHeight, settings.Quality);
+                    lastKeyFrameTimestamp = Environment.TickCount64;
+                }
+                else if (hasPrevious && TryDetectDelta(previousFrameBuffer!, currentPixels, sourceBitmap.Width, sourceBitmap.Height, stride, out deltaRegion, out coverage))
+                {
+                    if (coverage >= MaxDeltaCoverageBeforeKeyFrame)
+                    {
+                        message = CreateKeyFrameMessage(sourceBitmap, screenWidth, screenHeight, settings.Quality);
+                        lastKeyFrameTimestamp = Environment.TickCount64;
+                    }
+                    else
+                    {
+                        message = CreateDeltaMessage(sourceBitmap, screenWidth, screenHeight, settings.Quality, deltaRegion, coverage);
+                    }
+                }
+                else if (!hasPrevious)
+                {
+                    message = CreateKeyFrameMessage(sourceBitmap, screenWidth, screenHeight, settings.Quality);
+                    lastKeyFrameTimestamp = Environment.TickCount64;
+                }
+
+                previousFrameBuffer = currentPixels;
+                previousWidth = sourceBitmap.Width;
+                previousHeight = sourceBitmap.Height;
+                previousStride = stride;
+
+                return message;
             }
             finally
             {
                 scaledBitmap?.Dispose();
             }
+        }
+
+        private static void ResetFrameState()
+        {
+            previousFrameBuffer = null;
+            previousWidth = 0;
+            previousHeight = 0;
+            previousStride = 0;
+            lastKeyFrameTimestamp = 0;
+            frameSequence = 0;
+        }
+
+        private static byte[] ExtractPixels(Bitmap bitmap, out int stride)
+        {
+            var rect = new Rectangle(0, 0, bitmap.Width, bitmap.Height);
+            var bitmapData = bitmap.LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+
+            try
+            {
+                stride = bitmapData.Stride;
+                int byteCount = stride * bitmap.Height;
+                var buffer = new byte[byteCount];
+                Marshal.Copy(bitmapData.Scan0, buffer, 0, byteCount);
+                return buffer;
+            }
+            finally
+            {
+                bitmap.UnlockBits(bitmapData);
+            }
+        }
+
+        private static RemoteDesktopFrameMessage CreateKeyFrameMessage(Bitmap bitmap, int screenWidth, int screenHeight, int quality)
+        {
+            var imageData = EncodeBitmapToJpeg(bitmap, quality);
+            return new RemoteDesktopFrameMessage
+            {
+                ImageData = imageData,
+                Width = bitmap.Width,
+                Height = bitmap.Height,
+                OriginalWidth = screenWidth,
+                OriginalHeight = screenHeight,
+                IsDeltaFrame = false,
+                IsKeyFrame = true,
+                OffsetX = 0,
+                OffsetY = 0,
+                RegionWidth = bitmap.Width,
+                RegionHeight = bitmap.Height
+            };
+        }
+
+        private static RemoteDesktopFrameMessage CreateDeltaMessage(Bitmap sourceBitmap, int screenWidth, int screenHeight, int quality, Rectangle region, double coverage)
+        {
+            using var deltaBitmap = sourceBitmap.Clone(region, PixelFormat.Format32bppArgb);
+            int deltaQuality = coverage <= 0.1
+                ? Math.Min(100, quality + 12)
+                : Math.Min(100, quality + 5);
+            var imageData = EncodeBitmapToJpeg(deltaBitmap, deltaQuality);
+
+            return new RemoteDesktopFrameMessage
+            {
+                ImageData = imageData,
+                Width = sourceBitmap.Width,
+                Height = sourceBitmap.Height,
+                OriginalWidth = screenWidth,
+                OriginalHeight = screenHeight,
+                IsDeltaFrame = true,
+                IsKeyFrame = false,
+                OffsetX = region.X,
+                OffsetY = region.Y,
+                RegionWidth = region.Width,
+                RegionHeight = region.Height
+            };
+        }
+
+        private static bool TryDetectDelta(byte[] previous, byte[] current, int width, int height, int stride, out Rectangle region, out double coverage)
+        {
+            int left = width;
+            int right = -1;
+            int top = height;
+            int bottom = -1;
+            for (int y = 0; y < height; y++)
+            {
+                int rowOffset = y * stride;
+                for (int x = 0; x < width; x++)
+                {
+                    int index = rowOffset + x * BytesPerPixel;
+                    int diffB = Math.Abs(current[index] - previous[index]);
+                    int diffG = Math.Abs(current[index + 1] - previous[index + 1]);
+                    int diffR = Math.Abs(current[index + 2] - previous[index + 2]);
+                    int diffA = Math.Abs(current[index + 3] - previous[index + 3]);
+                    int totalDiff = diffR + diffG + diffB + diffA;
+
+                    if (totalDiff > PixelDifferenceThreshold)
+                    {
+                        if (x < left)
+                        {
+                            left = x;
+                        }
+
+                        if (x > right)
+                        {
+                            right = x;
+                        }
+
+                        if (y < top)
+                        {
+                            top = y;
+                        }
+
+                        if (y > bottom)
+                        {
+                            bottom = y;
+                        }
+                    }
+                }
+            }
+
+            if (right < left || bottom < top)
+            {
+                region = Rectangle.Empty;
+                coverage = 0;
+                return false;
+            }
+
+            const int padding = 4;
+            left = Math.Max(0, left - padding);
+            top = Math.Max(0, top - padding);
+            right = Math.Min(width - 1, right + padding);
+            bottom = Math.Min(height - 1, bottom + padding);
+
+            left = (left / 8) * 8;
+            top = (top / 8) * 8;
+            right = Math.Min(width - 1, ((right + 7) / 8) * 8);
+            bottom = Math.Min(height - 1, ((bottom + 7) / 8) * 8);
+
+            int regionWidth = Math.Max(1, right - left + 1);
+            int regionHeight = Math.Max(1, bottom - top + 1);
+
+            region = Rectangle.FromLTRB(left, top, left + regionWidth, top + regionHeight);
+            coverage = (regionWidth * regionHeight) / (double)Math.Max(1, width * height);
+            return true;
         }
 
         private static Bitmap CreateScaledBitmap(Bitmap source, int width, int height)
@@ -277,7 +473,7 @@ namespace SeacoreClient.Features.RemoteDesktop
         {
             public CaptureSettings(RemoteDesktopRequestMessage request)
             {
-                Interval = Math.Max(100, request?.IntervalMilliseconds ?? 500);
+                Interval = Math.Max(80, request?.IntervalMilliseconds ?? 500);
                 Quality = Math.Clamp(request?.JpegQuality ?? 70, 30, 100);
                 MaxWidth = Math.Clamp(request?.MaxFrameWidth ?? 0, 0, 8192);
                 MaxHeight = Math.Clamp(request?.MaxFrameHeight ?? 0, 0, 4320);

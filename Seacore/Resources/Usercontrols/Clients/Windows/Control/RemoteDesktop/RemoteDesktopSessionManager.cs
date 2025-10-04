@@ -31,6 +31,12 @@ namespace Seacore.Resources.Usercontrols.Clients.Windows.Control.RemoteDesktop
                 public int OriginalHeight { get; set; }
                 public long Timestamp { get; set; }
                 public string? StatusMessage { get; set; }
+                public bool IsDeltaFrame { get; set; }
+                public bool IsKeyFrame { get; set; }
+                public int OffsetX { get; set; }
+                public int OffsetY { get; set; }
+                public int RegionWidth { get; set; }
+                public int RegionHeight { get; set; }
 
                 public bool TryRegisterChunk(int index, byte[]? data)
                 {
@@ -76,7 +82,13 @@ namespace Seacore.Resources.Usercontrols.Clients.Windows.Control.RemoteDesktop
                         OriginalWidth = OriginalWidth,
                         OriginalHeight = OriginalHeight,
                         Timestamp = Timestamp,
-                        StatusMessage = StatusMessage
+                        StatusMessage = StatusMessage,
+                        IsDeltaFrame = IsDeltaFrame,
+                        IsKeyFrame = IsKeyFrame,
+                        OffsetX = OffsetX,
+                        OffsetY = OffsetY,
+                        RegionWidth = RegionWidth,
+                        RegionHeight = RegionHeight
                     };
                 }
             }
@@ -115,7 +127,13 @@ namespace Seacore.Resources.Usercontrols.Clients.Windows.Control.RemoteDesktop
                         OriginalWidth = frame.OriginalWidth > 0 ? frame.OriginalWidth : frame.Width,
                         OriginalHeight = frame.OriginalHeight > 0 ? frame.OriginalHeight : frame.Height,
                         Timestamp = frame.Timestamp,
-                        StatusMessage = frame.StatusMessage
+                        StatusMessage = frame.StatusMessage,
+                        IsDeltaFrame = frame.IsDeltaFrame,
+                        IsKeyFrame = frame.IsKeyFrame,
+                        OffsetX = frame.OffsetX,
+                        OffsetY = frame.OffsetY,
+                        RegionWidth = frame.RegionWidth,
+                        RegionHeight = frame.RegionHeight
                     };
 
                     pendingFrames[frame.SequenceId] = assembly;
@@ -126,6 +144,12 @@ namespace Seacore.Resources.Usercontrols.Clients.Windows.Control.RemoteDesktop
                 assembly.OriginalWidth = frame.OriginalWidth > 0 ? frame.OriginalWidth : assembly.OriginalWidth;
                 assembly.OriginalHeight = frame.OriginalHeight > 0 ? frame.OriginalHeight : assembly.OriginalHeight;
                 assembly.Timestamp = frame.Timestamp > 0 ? frame.Timestamp : assembly.Timestamp;
+                assembly.IsDeltaFrame = frame.IsDeltaFrame;
+                assembly.IsKeyFrame = frame.IsKeyFrame || frame.IsDeltaFrame == false;
+                assembly.OffsetX = frame.OffsetX != 0 || frame.RegionWidth > 0 ? frame.OffsetX : assembly.OffsetX;
+                assembly.OffsetY = frame.OffsetY != 0 || frame.RegionHeight > 0 ? frame.OffsetY : assembly.OffsetY;
+                assembly.RegionWidth = frame.RegionWidth > 0 ? frame.RegionWidth : assembly.RegionWidth;
+                assembly.RegionHeight = frame.RegionHeight > 0 ? frame.RegionHeight : assembly.RegionHeight;
 
                 if (!string.IsNullOrWhiteSpace(frame.StatusMessage))
                 {
