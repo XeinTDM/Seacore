@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using MessagePack;
 using SeacoreClient.Handlers;
@@ -22,6 +23,14 @@ namespace SeacoreClient.Core
         private static readonly Random jitterer = new();
         private readonly SemaphoreSlim sendLock = new(1, 1);
         private readonly object connectionLock = new();
+        private readonly Channel<MessageBase> inboundMessages = Channel.CreateUnbounded<MessageBase>(new UnboundedChannelOptions
+        {
+            AllowSynchronousContinuations = false,
+            SingleReader = true,
+            SingleWriter = false
+        });
+        private readonly CancellationTokenSource messageProcessingCts = new();
+        private readonly Task messageProcessingTask;
 
         private HeartbeatSender? heartbeatSender;
         private bool allowReconnect = true;
@@ -39,6 +48,7 @@ namespace SeacoreClient.Core
         {
             serverIp = ip;
             serverPort = port;
+            messageProcessingTask = Task.Run(() => ProcessIncomingMessagesAsync(messageProcessingCts.Token));
         }
 
         public async Task RunAsync(CancellationToken cancellationToken = default)
@@ -163,6 +173,23 @@ namespace SeacoreClient.Core
             }
 
             Stop();
+            inboundMessages.Writer.TryComplete();
+            messageProcessingCts.Cancel();
+
+            try
+            {
+                messageProcessingTask.GetAwaiter().GetResult();
+            }
+            catch (OperationCanceledException)
+            {
+                // expected when shutting down
+            }
+            catch (ChannelClosedException)
+            {
+                // channel already closed
+            }
+
+            messageProcessingCts.Dispose();
             disposed = true;
             GC.SuppressFinalize(this);
         }
@@ -358,14 +385,7 @@ namespace SeacoreClient.Core
                                 var message = MessagePackSerializer.Deserialize<MessageBase>(messageBuffer.AsMemory(0, messageLength), SerializerOptions);
                                 Console.WriteLine($"Received message of type: {message.GetType().Name}");
 
-                                try
-                                {
-                                    MessageHandler.ProcessMessage(message, this);
-                                }
-                                catch (Exception handlerEx)
-                                {
-                                    Console.WriteLine($"Error processing message: {handlerEx.Message}");
-                                }
+                                await EnqueueIncomingMessageAsync(message, cancellationToken);
                             }
                             catch (MessagePackSerializationException ex)
                             {
@@ -419,6 +439,47 @@ namespace SeacoreClient.Core
             if (disposed)
             {
                 throw new ObjectDisposedException(nameof(TcpClientManager));
+            }
+        }
+
+        private async Task EnqueueIncomingMessageAsync(MessageBase message, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await inboundMessages.Writer.WriteAsync(message, cancellationToken);
+            }
+            catch (ChannelClosedException)
+            {
+                // shutting down, ignore new messages
+            }
+        }
+
+        private async Task ProcessIncomingMessagesAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                while (await inboundMessages.Reader.WaitToReadAsync(cancellationToken))
+                {
+                    while (inboundMessages.Reader.TryRead(out var message))
+                    {
+                        try
+                        {
+                            MessageHandler.ProcessMessage(message, this);
+                        }
+                        catch (Exception handlerEx)
+                        {
+                            Console.WriteLine($"Error processing message: {handlerEx.Message}");
+                        }
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // shutting down
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Unhandled error in message processing loop: {ex.Message}");
             }
         }
     }
