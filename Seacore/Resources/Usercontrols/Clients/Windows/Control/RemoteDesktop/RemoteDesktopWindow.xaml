@@ -20,11 +20,22 @@
                 </Grid>
             </Border>
 
-            <Grid Grid.Row="1">
+            <Grid Grid.Row="1" Margin="10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
 
-                <Grid>
-                    <TextBlock Text="Remote Desktop" Foreground="White"/>
-                </Grid>
+                <StackPanel Orientation="Vertical" Grid.Row="0" Margin="0,0,0,10">
+                    <TextBlock x:Name="clientNameTextBlock" Text="Remote Desktop" Foreground="White" FontSize="16" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="statusTextBlock" Text="Waiting for stream..." Foreground="#B0B0B0" FontSize="12"/>
+                </StackPanel>
+
+                <Border Grid.Row="1" Background="#111111" CornerRadius="4">
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                        <Image x:Name="remoteDesktopImage" Stretch="Uniform" Margin="5"/>
+                    </ScrollViewer>
+                </Border>
             </Grid>
         </Grid>
     </Border>

