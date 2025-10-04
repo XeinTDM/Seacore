@@ -1,20 +1,22 @@
-﻿using SeacoreCommon.Messages;
+using System.Threading;
+using System.Threading.Tasks;
+using SeacoreCommon.Messages;
 
 namespace SeacoreClient.Core
 {
     public class HeartbeatSender : IDisposable
     {
-        private readonly CancellationTokenSource cts = new CancellationTokenSource();
+        private readonly CancellationTokenSource cts = new();
         private NetworkCondition networkCondition = NetworkCondition.Good;
-        private readonly object timerLock = new object();
+        private readonly object timerLock = new();
         private readonly TcpClientManager clientManager;
-        private readonly Random jitterer = new Random();
+        private readonly Random jitterer = new();
         private readonly HeartbeatConfig config;
-        private int consecutiveFailures = 0;
-        private long lastHeartbeatSent = 0;
-        private bool isSending = false;
+        private int consecutiveFailures;
+        private long lastHeartbeatSent;
+        private bool isSending;
         private Timer? heartbeatTimer;
-        private long lastRtt = 0;
+        private long lastRtt;
 
         public event Action? OnHeartbeatFailure;
 
@@ -33,6 +35,11 @@ namespace SeacoreClient.Core
         {
             lock (timerLock)
             {
+                if (cts.IsCancellationRequested)
+                {
+                    return;
+                }
+
                 cts.Cancel();
                 heartbeatTimer?.Dispose();
                 heartbeatTimer = null;
@@ -41,6 +48,11 @@ namespace SeacoreClient.Core
 
         public void HandleHeartbeatAck(long serverTimestamp)
         {
+            if (cts.IsCancellationRequested)
+            {
+                return;
+            }
+
             var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             lastRtt = now - lastHeartbeatSent;
 
@@ -55,7 +67,9 @@ namespace SeacoreClient.Core
         private async Task SendHeartbeatAsync()
         {
             if (isSending)
+            {
                 return;
+            }
 
             try
             {
@@ -67,9 +81,13 @@ namespace SeacoreClient.Core
                     ClientTimestamp = lastHeartbeatSent
                 };
 
-                clientManager.SendMessage(heartbeatMessage);
+                await clientManager.SendMessageAsync(heartbeatMessage, cts.Token);
 
                 Console.WriteLine($"Heartbeat sent at {lastHeartbeatSent} ms");
+            }
+            catch (OperationCanceledException) when (cts.IsCancellationRequested)
+            {
+                // shutting down
             }
             catch (Exception ex)
             {
@@ -86,7 +104,7 @@ namespace SeacoreClient.Core
             {
                 isSending = false;
 
-                if (consecutiveFailures < config.MaxConsecutiveFailures)
+                if (!cts.IsCancellationRequested && consecutiveFailures < config.MaxConsecutiveFailures)
                 {
                     ScheduleNextHeartbeat(ComputeInterval(networkCondition));
                 }

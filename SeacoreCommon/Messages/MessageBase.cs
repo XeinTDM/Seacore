@@ -10,6 +10,8 @@ namespace SeacoreCommon.Messages
     [Union(4, typeof(ChromiumRecoveryMessage))]
     [Union(5, typeof(UnknownMessage))]
     [Union(6, typeof(ClientIdentificationMessage))]
+    [Union(7, typeof(RemoteDesktopRequestMessage))]
+    [Union(8, typeof(RemoteDesktopFrameMessage))]
     public abstract class MessageBase
     {
     }

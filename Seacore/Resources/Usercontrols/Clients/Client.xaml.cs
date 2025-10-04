@@ -57,7 +57,7 @@ namespace Seacore.Resources.Usercontrols
                         break;
                     case "RemoteDesktop":
                         Log.Information("Action '{Action}' triggered for client {ClientEndPoint}", action, clientInfo.TcpClient.Client.RemoteEndPoint);
-                        new RemoteDesktopWindow().Show();
+                        new RemoteDesktopWindow(clientInfo).Show();
                         break;
                     case "Webcam":
                         Log.Information("Action '{Action}' triggered for client {ClientEndPoint}", action, clientInfo.TcpClient.Client.RemoteEndPoint);

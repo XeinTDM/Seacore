@@ -1,4 +1,8 @@
-﻿{
+{
+    "Server": {
+        "Host": "127.0.0.1",
+        "Port": 2332
+    },
     "HeartbeatConfig": {
         "ExcellentInterval": 8000,
         "GoodInterval": 15000,
