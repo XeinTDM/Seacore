@@ -1,5 +1,6 @@
-﻿using SeacoreCommon.Messages;
+using System.Threading.Tasks;
 using SeacoreClient.Core;
+using SeacoreCommon.Messages;
 
 namespace SeacoreClient.Handlers
 {
@@ -15,15 +16,17 @@ namespace SeacoreClient.Handlers
 
         private void HandleCommands()
         {
-            Task.Run(() =>
+            _ = Task.Run(async () =>
             {
                 while (true)
                 {
-                    string command = Console.ReadLine();
+                    string? command = Console.ReadLine();
                     if (string.IsNullOrEmpty(command))
+                    {
                         continue;
+                    }
 
-                    MessageBase message = command.ToUpper() switch
+                    MessageBase message = command.ToUpperInvariant() switch
                     {
                         "HEARTBEAT" => new HeartbeatMessage { ClientTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() },
                         "DISCONNECT" => new DisconnectMessage(),
@@ -32,7 +35,18 @@ namespace SeacoreClient.Handlers
                         _ => new UnknownMessage { RawMessage = command },
                     };
 
-                    clientManager.SendMessage(message);
+                    try
+                    {
+                        await clientManager.SendMessageAsync(message);
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Failed to send command '{command}': {ex.Message}");
+                    }
                 }
             });
         }

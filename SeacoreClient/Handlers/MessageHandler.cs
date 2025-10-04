@@ -21,7 +21,7 @@ namespace SeacoreClient.Handlers
 
                 case ReconnectMessage:
                     Console.WriteLine("Reconnect command received.");
-                    clientManager.RunAsync().Wait();
+                    clientManager.RequestReconnect();
                     break;
 
                 case ChromiumRecoveryMessage:
