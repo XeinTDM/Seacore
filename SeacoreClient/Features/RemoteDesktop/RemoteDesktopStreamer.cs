@@ -5,14 +5,20 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows.Forms;
 
 namespace SeacoreClient.Features.RemoteDesktop
 {
     public static class RemoteDesktopStreamer
     {
+        private const int SmCxScreen = 0;
+        private const int SmCyScreen = 1;
+
+        [DllImport("user32.dll")]
+        private static extern int GetSystemMetrics(int nIndex);
+
         private static readonly object syncRoot = new();
         private static CancellationTokenSource? captureCts;
 
@@ -25,7 +31,7 @@ namespace SeacoreClient.Features.RemoteDesktop
 
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                _ = SendStatusAsync(clientManager, "Remote desktop is only supported on Windows clients.", CancellationToken.None);
+                _ = SendStatusAsync(clientManager, "Remote desktop stream ended: Remote desktop is only supported on Windows clients.", CancellationToken.None);
                 return;
             }
 
@@ -97,15 +103,22 @@ namespace SeacoreClient.Features.RemoteDesktop
             }
         }
 
+        [SupportedOSPlatform("windows")]
         private static RemoteDesktopFrameMessage CaptureFrame(int quality)
         {
-            var screen = Screen.PrimaryScreen ?? throw new InvalidOperationException("No primary screen available for capture.");
-            var bounds = screen.Bounds;
+            int width = GetSystemMetrics(SmCxScreen);
+            int height = GetSystemMetrics(SmCyScreen);
 
-            using var bitmap = new Bitmap(bounds.Width, bounds.Height, PixelFormat.Format32bppArgb);
+            if (width <= 0 || height <= 0)
+            {
+                throw new InvalidOperationException("Unable to determine primary screen dimensions for capture.");
+            }
+
+            using var bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
             using (var graphics = Graphics.FromImage(bitmap))
             {
-                graphics.CopyFromScreen(bounds.Location, Point.Empty, bounds.Size);
+                var captureSize = new Size(width, height);
+                graphics.CopyFromScreen(Point.Empty, Point.Empty, captureSize, CopyPixelOperation.SourceCopy);
             }
 
             using var memoryStream = new MemoryStream();
@@ -118,8 +131,8 @@ namespace SeacoreClient.Features.RemoteDesktop
             return new RemoteDesktopFrameMessage
             {
                 ImageData = memoryStream.ToArray(),
-                Width = bounds.Width,
-                Height = bounds.Height
+                Width = width,
+                Height = height
             };
         }
 
