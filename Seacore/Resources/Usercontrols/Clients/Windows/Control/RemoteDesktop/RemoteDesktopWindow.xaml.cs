@@ -585,6 +585,11 @@ namespace Seacore.Resources.Usercontrols.Clients.Windows.Control.RemoteDesktop
 
         private void InputToggle_Changed(object sender, RoutedEventArgs e)
         {
+            if (mouseInputCheckBox is null || keyboardInputCheckBox is null)
+            {
+                return;
+            }
+
             bool enableMouse = mouseInputCheckBox.IsChecked == true;
             bool enableKeyboard = keyboardInputCheckBox.IsChecked == true;
 
