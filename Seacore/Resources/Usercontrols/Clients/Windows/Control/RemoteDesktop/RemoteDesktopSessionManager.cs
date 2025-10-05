@@ -370,7 +370,9 @@ namespace Seacore.Resources.Usercontrols.Clients.Windows.Control.RemoteDesktop
                 IntervalMilliseconds = session.LastRequest?.IntervalMilliseconds ?? 500,
                 JpegQuality = session.LastRequest?.JpegQuality ?? 70,
                 MaxFrameWidth = session.LastRequest?.MaxFrameWidth ?? 0,
-                MaxFrameHeight = session.LastRequest?.MaxFrameHeight ?? 0
+                MaxFrameHeight = session.LastRequest?.MaxFrameHeight ?? 0,
+                EnableMouseControl = session.LastRequest?.EnableMouseControl ?? true,
+                EnableKeyboardControl = session.LastRequest?.EnableKeyboardControl ?? true
             };
 
             SendRequest(clientInfo.TcpClient, stopMessage);
@@ -387,6 +389,8 @@ namespace Seacore.Resources.Usercontrols.Clients.Windows.Control.RemoteDesktop
             int quality = Math.Clamp(request?.JpegQuality ?? 70, 30, 100);
             int maxWidth = Math.Clamp(request?.MaxFrameWidth ?? 0, 0, 8192);
             int maxHeight = Math.Clamp(request?.MaxFrameHeight ?? 0, 0, 4320);
+            bool enableMouse = request?.EnableMouseControl ?? true;
+            bool enableKeyboard = request?.EnableKeyboardControl ?? true;
 
             return new RemoteDesktopRequestMessage
             {
@@ -394,7 +398,9 @@ namespace Seacore.Resources.Usercontrols.Clients.Windows.Control.RemoteDesktop
                 IntervalMilliseconds = interval,
                 JpegQuality = quality,
                 MaxFrameWidth = maxWidth,
-                MaxFrameHeight = maxHeight
+                MaxFrameHeight = maxHeight,
+                EnableMouseControl = enableMouse,
+                EnableKeyboardControl = enableKeyboard
             };
         }
 
@@ -408,7 +414,9 @@ namespace Seacore.Resources.Usercontrols.Clients.Windows.Control.RemoteDesktop
             return existing.IntervalMilliseconds != updated.IntervalMilliseconds
                 || existing.JpegQuality != updated.JpegQuality
                 || existing.MaxFrameWidth != updated.MaxFrameWidth
-                || existing.MaxFrameHeight != updated.MaxFrameHeight;
+                || existing.MaxFrameHeight != updated.MaxFrameHeight
+                || existing.EnableMouseControl != updated.EnableMouseControl
+                || existing.EnableKeyboardControl != updated.EnableKeyboardControl;
         }
 
         private static void SendRequest(TcpClient client, RemoteDesktopRequestMessage request)

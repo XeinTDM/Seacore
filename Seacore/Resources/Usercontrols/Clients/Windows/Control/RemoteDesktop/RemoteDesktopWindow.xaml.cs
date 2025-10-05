@@ -19,6 +19,14 @@ namespace Seacore.Resources.Usercontrols.Clients.Windows.Control.RemoteDesktop
         private const int MaxStreamWidth = 3840;
         private const int MaxStreamHeight = 2160;
 
+        private enum QualityProfile
+        {
+            Performance,
+            Balanced,
+            High,
+            Ultra
+        }
+
         private readonly ClientInfo clientInfo;
         private readonly DispatcherTimer resizeThrottleTimer;
         private readonly RemoteDesktopRequestMessage currentRequest = new RemoteDesktopRequestMessage
@@ -26,12 +34,20 @@ namespace Seacore.Resources.Usercontrols.Clients.Windows.Control.RemoteDesktop
             IntervalMilliseconds = 250,
             JpegQuality = 70,
             MaxFrameWidth = 1280,
-            MaxFrameHeight = 720
+            MaxFrameHeight = 720,
+            EnableMouseControl = true,
+            EnableKeyboardControl = true
         };
 
         private long lastFrameTimestamp;
         private WriteableBitmap? currentBitmap;
         private bool awaitingKeyFrame = true;
+        private QualityProfile selectedQualityProfile = QualityProfile.Balanced;
+        private readonly object renderSyncRoot = new();
+        private RemoteDesktopFrameMessage? pendingFrame;
+        private bool renderScheduled;
+        private byte[]? deltaScratchBuffer;
+        private bool forceNextRequest;
 
         public RemoteDesktopWindow(ClientInfo clientInfo)
         {
@@ -59,6 +75,9 @@ namespace Seacore.Resources.Usercontrols.Clients.Windows.Control.RemoteDesktop
         private void RemoteDesktopWindow_Loaded(object sender, RoutedEventArgs e)
         {
             statusTextBlock.Text = "Requesting remote desktop stream...";
+            selectedQualityProfile = GetSelectedQualityProfile();
+            currentRequest.EnableMouseControl = mouseInputCheckBox.IsChecked == true;
+            currentRequest.EnableKeyboardControl = keyboardInputCheckBox.IsChecked == true;
             RemoteDesktopSessionManager.Instance.Register(clientInfo, this);
             RemoteDesktopSessionManager.Instance.StartSession(clientInfo, CreateRequestSnapshot());
 
@@ -79,80 +98,18 @@ namespace Seacore.Resources.Usercontrols.Clients.Windows.Control.RemoteDesktop
                 return;
             }
 
-            Dispatcher.Invoke(() =>
+            lock (renderSyncRoot)
             {
-                if (frame.ImageData?.Length > 0)
+                pendingFrame = frame;
+                if (renderScheduled)
                 {
-                    try
-                    {
-                        if (!TryRenderFrame(frame))
-                        {
-                            statusTextBlock.Text = "Awaiting key frame...";
-                            return;
-                        }
-
-                        long frameTimestamp = frame.Timestamp > 0
-                            ? frame.Timestamp
-                            : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                        var timestampLocal = DateTimeOffset.FromUnixTimeMilliseconds(frameTimestamp).LocalDateTime;
-
-                        double? fps = null;
-                        if (lastFrameTimestamp > 0 && frameTimestamp > lastFrameTimestamp)
-                        {
-                            double frameDelta = frameTimestamp - lastFrameTimestamp;
-                            if (frameDelta > 0)
-                            {
-                                fps = 1000.0 / frameDelta;
-                            }
-                        }
-
-                        lastFrameTimestamp = frameTimestamp;
-
-                        int displayWidth = frame.Width > 0 ? frame.Width : currentBitmap?.PixelWidth ?? frame.Width;
-                        int displayHeight = frame.Height > 0 ? frame.Height : currentBitmap?.PixelHeight ?? frame.Height;
-                        int sourceWidth = frame.OriginalWidth > 0 ? frame.OriginalWidth : displayWidth;
-                        int sourceHeight = frame.OriginalHeight > 0 ? frame.OriginalHeight : displayHeight;
-
-                        string status = $"Stream: {displayWidth}x{displayHeight}";
-                        if (sourceWidth != displayWidth || sourceHeight != displayHeight)
-                        {
-                            status += $" (source {sourceWidth}x{sourceHeight})";
-                        }
-
-                        if (fps.HasValue)
-                        {
-                            status += $" • ~{fps.Value:0.0} fps";
-                        }
-
-                        if (frame.IsDeltaFrame && frame.RegionWidth > 0 && frame.RegionHeight > 0)
-                        {
-                            double coverage = (frame.RegionWidth * frame.RegionHeight) / (double)Math.Max(1, displayWidth * displayHeight);
-                            status += $" • Δ {coverage * 100:0.#}%";
-                        }
-
-                        status += $" • Updated: {timestampLocal:HH:mm:ss}";
-
-                        if (!string.IsNullOrWhiteSpace(frame.StatusMessage))
-                        {
-                            status += $" • {frame.StatusMessage}";
-                        }
-
-                        statusTextBlock.Text = status;
-                    }
-                    catch (Exception ex)
-                    {
-                        statusTextBlock.Text = $"Failed to render frame: {ex.Message}";
-                    }
+                    return;
                 }
-                else if (!string.IsNullOrWhiteSpace(frame.StatusMessage))
-                {
-                    remoteDesktopImage.Source = null;
-                    currentBitmap = null;
-                    statusTextBlock.Text = frame.StatusMessage;
-                    lastFrameTimestamp = 0;
-                    awaitingKeyFrame = true;
-                }
-            });
+
+                renderScheduled = true;
+            }
+
+            Dispatcher.InvokeAsync(ProcessPendingFrame, DispatcherPriority.Render);
         }
 
         public void OnSessionStarted(ClientInfo client)
@@ -189,6 +146,108 @@ namespace Seacore.Resources.Usercontrols.Clients.Windows.Control.RemoteDesktop
                 awaitingKeyFrame = true;
                 currentBitmap = null;
             });
+        }
+
+        private void ProcessPendingFrame()
+        {
+            while (true)
+            {
+                RemoteDesktopFrameMessage? frameToRender;
+
+                lock (renderSyncRoot)
+                {
+                    frameToRender = pendingFrame;
+                    if (frameToRender is null)
+                    {
+                        renderScheduled = false;
+                        return;
+                    }
+
+                    pendingFrame = null;
+                }
+
+                try
+                {
+                    RenderFrameInternal(frameToRender);
+                }
+                catch (Exception ex)
+                {
+                    statusTextBlock.Text = $"Failed to render frame: {ex.Message}";
+                }
+            }
+        }
+
+        private void RenderFrameInternal(RemoteDesktopFrameMessage frame)
+        {
+            if (frame.ImageData?.Length > 0)
+            {
+                if (!TryRenderFrame(frame))
+                {
+                    statusTextBlock.Text = "Awaiting key frame...";
+                    return;
+                }
+
+                UpdateStatusForFrame(frame);
+            }
+            else if (!string.IsNullOrWhiteSpace(frame.StatusMessage))
+            {
+                remoteDesktopImage.Source = null;
+                currentBitmap = null;
+                statusTextBlock.Text = frame.StatusMessage;
+                lastFrameTimestamp = 0;
+                awaitingKeyFrame = true;
+            }
+        }
+
+        private void UpdateStatusForFrame(RemoteDesktopFrameMessage frame)
+        {
+            long frameTimestamp = frame.Timestamp > 0
+                ? frame.Timestamp
+                : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            var timestampLocal = DateTimeOffset.FromUnixTimeMilliseconds(frameTimestamp).LocalDateTime;
+
+            double? fps = null;
+            if (lastFrameTimestamp > 0 && frameTimestamp > lastFrameTimestamp)
+            {
+                double frameDelta = frameTimestamp - lastFrameTimestamp;
+                if (frameDelta > 0)
+                {
+                    fps = 1000.0 / frameDelta;
+                }
+            }
+
+            lastFrameTimestamp = frameTimestamp;
+
+            int displayWidth = frame.Width > 0 ? frame.Width : currentBitmap?.PixelWidth ?? frame.Width;
+            int displayHeight = frame.Height > 0 ? frame.Height : currentBitmap?.PixelHeight ?? frame.Height;
+            int sourceWidth = frame.OriginalWidth > 0 ? frame.OriginalWidth : displayWidth;
+            int sourceHeight = frame.OriginalHeight > 0 ? frame.OriginalHeight : displayHeight;
+
+            string status = $"Stream: {displayWidth}x{displayHeight}";
+            if (sourceWidth != displayWidth || sourceHeight != displayHeight)
+            {
+                status += $" (source {sourceWidth}x{sourceHeight})";
+            }
+
+            if (fps.HasValue)
+            {
+                status += $" • ~{fps.Value:0.0} fps";
+            }
+
+            if (frame.IsDeltaFrame && frame.RegionWidth > 0 && frame.RegionHeight > 0)
+            {
+                double coverage = (frame.RegionWidth * frame.RegionHeight) / (double)Math.Max(1, displayWidth * displayHeight);
+                status += $" • Δ {coverage * 100:0.#}%";
+            }
+
+            status += $" • Updated: {timestampLocal:HH:mm:ss}";
+
+            if (!string.IsNullOrWhiteSpace(frame.StatusMessage))
+            {
+                status += $" • {frame.StatusMessage}";
+            }
+
+            statusTextBlock.Text = status;
         }
 
         private bool TryRenderFrame(RemoteDesktopFrameMessage frame)
@@ -233,10 +292,6 @@ namespace Seacore.Resources.Usercontrols.Clients.Windows.Control.RemoteDesktop
                     return true;
                 }
 
-                int stride = (formatted.Format.BitsPerPixel * regionWidth + 7) / 8;
-                var pixelData = new byte[stride * regionHeight];
-                formatted.CopyPixels(new Int32Rect(0, 0, regionWidth, regionHeight), pixelData, stride, 0);
-
                 var updateRect = new Int32Rect(
                     Math.Clamp(frame.OffsetX, 0, Math.Max(0, currentBitmap.PixelWidth - 1)),
                     Math.Clamp(frame.OffsetY, 0, Math.Max(0, currentBitmap.PixelHeight - 1)),
@@ -246,12 +301,19 @@ namespace Seacore.Resources.Usercontrols.Clients.Windows.Control.RemoteDesktop
                 updateRect.Width = Math.Min(updateRect.Width, currentBitmap.PixelWidth - updateRect.X);
                 updateRect.Height = Math.Min(updateRect.Height, currentBitmap.PixelHeight - updateRect.Y);
 
+                regionWidth = Math.Min(regionWidth, updateRect.Width);
+                regionHeight = Math.Min(regionHeight, updateRect.Height);
+
                 if (updateRect.Width <= 0 || updateRect.Height <= 0)
                 {
                     return true;
                 }
 
-                currentBitmap.WritePixels(updateRect, pixelData, stride, 0);
+                int stride = (formatted.Format.BitsPerPixel * regionWidth + 7) / 8;
+                EnsureDeltaBufferCapacity(stride * regionHeight);
+                formatted.CopyPixels(new Int32Rect(0, 0, regionWidth, regionHeight), deltaScratchBuffer!, stride, 0);
+
+                currentBitmap.WritePixels(new Int32Rect(updateRect.X, updateRect.Y, regionWidth, regionHeight), deltaScratchBuffer!, stride, 0);
                 remoteDesktopImage.Source = currentBitmap;
                 awaitingKeyFrame = false;
                 return true;
@@ -319,14 +381,25 @@ namespace Seacore.Resources.Usercontrols.Clients.Windows.Control.RemoteDesktop
         private void ResizeThrottleTimer_Tick(object? sender, EventArgs e)
         {
             resizeThrottleTimer.Stop();
-            RecalculateCaptureRequest();
+            bool force = forceNextRequest;
+            forceNextRequest = false;
+            RecalculateCaptureRequest(force);
         }
 
-        private void ScheduleRequestRecalculation()
+        private void ScheduleRequestRecalculation(bool force = false)
         {
             if (!IsLoaded)
             {
+                if (force)
+                {
+                    forceNextRequest = true;
+                }
                 return;
+            }
+
+            if (force)
+            {
+                forceNextRequest = true;
             }
 
             resizeThrottleTimer.Stop();
@@ -337,14 +410,19 @@ namespace Seacore.Resources.Usercontrols.Clients.Windows.Control.RemoteDesktop
         {
             Size viewport = GetViewportPixelSize();
 
-            int targetWidth = (int)Math.Round(viewport.Width);
-            int targetHeight = (int)Math.Round(viewport.Height);
+            var profileSettings = GetQualityProfileSettings();
+
+            int targetWidth = (int)Math.Round(viewport.Width * profileSettings.ResolutionScale);
+            int targetHeight = (int)Math.Round(viewport.Height * profileSettings.ResolutionScale);
 
             targetWidth = Math.Clamp(targetWidth, MinStreamWidth, MaxStreamWidth);
             targetHeight = Math.Clamp(targetHeight, MinStreamHeight, MaxStreamHeight);
 
-            int nextQuality = CalculateQuality(targetWidth, targetHeight);
-            int nextInterval = CalculateInterval(targetWidth, targetHeight);
+            int baseQuality = CalculateQuality(targetWidth, targetHeight);
+            int nextQuality = Math.Clamp(baseQuality + profileSettings.QualityOffset, profileSettings.MinQuality, profileSettings.MaxQuality);
+            int baseInterval = CalculateInterval(targetWidth, targetHeight);
+            int nextInterval = (int)Math.Round(baseInterval * profileSettings.IntervalMultiplier);
+            nextInterval = Math.Clamp(nextInterval, profileSettings.MinInterval, profileSettings.MaxInterval);
 
             if (!force
                 && currentRequest.MaxFrameWidth == targetWidth
@@ -458,8 +536,89 @@ namespace Seacore.Resources.Usercontrols.Clients.Windows.Control.RemoteDesktop
                 IntervalMilliseconds = currentRequest.IntervalMilliseconds,
                 JpegQuality = currentRequest.JpegQuality,
                 MaxFrameWidth = currentRequest.MaxFrameWidth,
-                MaxFrameHeight = currentRequest.MaxFrameHeight
+                MaxFrameHeight = currentRequest.MaxFrameHeight,
+                EnableMouseControl = currentRequest.EnableMouseControl,
+                EnableKeyboardControl = currentRequest.EnableKeyboardControl
             };
+        }
+
+        private QualityProfile GetSelectedQualityProfile()
+        {
+            if (qualityComboBox?.SelectedValue is string tag && Enum.TryParse(tag, true, out QualityProfile profile))
+            {
+                return profile;
+            }
+
+            return QualityProfile.Balanced;
+        }
+
+        private QualityProfileSettings GetQualityProfileSettings()
+        {
+            return selectedQualityProfile switch
+            {
+                QualityProfile.Performance => new QualityProfileSettings(0.75, 0.82, -10, 45, 85, 70, 240),
+                QualityProfile.High => new QualityProfileSettings(1.0, 1.12, 6, 60, 96, 100, 320),
+                QualityProfile.Ultra => new QualityProfileSettings(1.0, 1.28, 12, 70, 100, 130, 420),
+                _ => new QualityProfileSettings(0.9, 1.0, 0, 55, 92, 80, 260)
+            };
+        }
+
+        private void EnsureDeltaBufferCapacity(int length)
+        {
+            if (deltaScratchBuffer == null || deltaScratchBuffer.Length < length)
+            {
+                deltaScratchBuffer = new byte[length];
+            }
+        }
+
+        private void QualityComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            selectedQualityProfile = GetSelectedQualityProfile();
+
+            if (!IsLoaded)
+            {
+                return;
+            }
+
+            RecalculateCaptureRequest(force: true);
+        }
+
+        private void InputToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            bool enableMouse = mouseInputCheckBox.IsChecked == true;
+            bool enableKeyboard = keyboardInputCheckBox.IsChecked == true;
+
+            currentRequest.EnableMouseControl = enableMouse;
+            currentRequest.EnableKeyboardControl = enableKeyboard;
+
+            if (!IsLoaded)
+            {
+                return;
+            }
+
+            RemoteDesktopSessionManager.Instance.StartSession(clientInfo, CreateRequestSnapshot());
+        }
+
+        private readonly struct QualityProfileSettings
+        {
+            public QualityProfileSettings(double resolutionScale, double intervalMultiplier, int qualityOffset, int minQuality, int maxQuality, int minInterval, int maxInterval)
+            {
+                ResolutionScale = resolutionScale;
+                IntervalMultiplier = intervalMultiplier;
+                QualityOffset = qualityOffset;
+                MinQuality = minQuality;
+                MaxQuality = maxQuality;
+                MinInterval = minInterval;
+                MaxInterval = maxInterval;
+            }
+
+            public double ResolutionScale { get; }
+            public double IntervalMultiplier { get; }
+            public int QualityOffset { get; }
+            public int MinQuality { get; }
+            public int MaxQuality { get; }
+            public int MinInterval { get; }
+            public int MaxInterval { get; }
         }
 
         #region Behaviours

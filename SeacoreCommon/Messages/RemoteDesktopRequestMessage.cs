@@ -19,5 +19,11 @@ namespace SeacoreCommon.Messages
 
         [Key(4)]
         public int MaxFrameHeight { get; set; }
+
+        [Key(5)]
+        public bool EnableMouseControl { get; set; } = true;
+
+        [Key(6)]
+        public bool EnableKeyboardControl { get; set; } = true;
     }
 }
